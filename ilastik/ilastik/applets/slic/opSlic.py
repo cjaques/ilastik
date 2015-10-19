@@ -74,10 +74,11 @@ class OpSlic(Operator):
         Compute SLIC superpixel segmentation
         """        
         if slot==self.SegmentedImage:
-            
+            # print '------------------- DEBUG ---------------- IN OPSLIC ----'
+            # traceback.print_stack()
             region = self.InputVolume[0].get(roi).wait()
             result = numpy.zeros( region.shape,dtype=numpy.float32)
-
+            # print 'Region shape to SLIC ' ,region.shape
             result = slic.ArgsTest(region,region.shape[0],region.shape[1], self.SuperPixelSize.value ,self.Cubeness.value)
             
         else: 

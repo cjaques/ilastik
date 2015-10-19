@@ -233,9 +233,9 @@ class Tiling(object):
 
         # DEBUG PART... to remove
         print '------------- DEBUG -------------------'
-        # traceback.print_stack() # To debug ... CHRIs
+        traceback.print_stack() # To debug ... CHRIs
         # pdb.set_trace()
-        print '[TILING.py] - numPatches = ', numPatches, ' overlap = ', self._overlap
+        # print '[TILING.py] - numPatches = ', numPatches, ' overlap = ', self._overlap
 
     @property
     def data2scene(self):
