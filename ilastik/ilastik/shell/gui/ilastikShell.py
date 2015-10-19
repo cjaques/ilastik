@@ -552,7 +552,6 @@ class IlastikShell(QMainWindow):
 
         pos = 1
         for workflow, _name, displayName in getAvailableWorkflows():
-            print _name 
             b = QToolButton(self.startscreen, objectName="NewProjectButton_" + workflow.__name__)
             styleStartScreenButton(b, ilastikIcons.GoNext)
             b.setText(displayName)

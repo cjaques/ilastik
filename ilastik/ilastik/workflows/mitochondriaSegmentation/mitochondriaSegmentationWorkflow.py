@@ -15,8 +15,8 @@ from ilastik.workflow import Workflow
 from ilastik.applets.projectMetadata import ProjectMetadataApplet
 from ilastik.applets.dataSelection import DataSelectionApplet
 from ilastik.applets.featureSelection import FeatureSelectionApplet
-from ilastik.applets.mitochondriaSegmentation import MitochondriaSegmentationApplet, MitochondriaSegmentationDataExportApplet
-from ilastik.applets.batchProcessing import BatchProcessingApplet
+# from ilastik.applets.mitochondriaSegmentation import MitochondriaSegmentationApplet, MitochondriaSegmentationDataExportApplet
+# from ilastik.applets.batchProcessing import BatchProcessingApplet
 
 from ilastik.applets.slic import SlicApplet
 
@@ -106,7 +106,7 @@ class MitochondriaSegmentationWorkflow(Workflow):
         opSlicView.InputVolume.connect( opDataSelectionView.Image )
         # opSlicView.OtherInput.connect( opDataSelectionView.ImageGroup[1] )
 
-    def handleAppletStateUpdateRequested(self):
+    def handleAppletStateUpdateRequested(self): 
         """
         Overridden from Workflow base class
         Called when an applet has fired the :py:attr:`Applet.statusUpdateSignal`

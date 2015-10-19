@@ -87,6 +87,7 @@ class OpTaskWorker(Operator):
         if len( roi.start ) != len( self.Input.meta.shape ):
             assert False, "Task roi: {} is not valid for this input.  Did the master launch this task correctly?".format( roiString )
 
+        print "Executing for roi: {}".format(roi) 
         logger.info( "Executing for roi: {}".format(roi) )
 
         if config.use_node_local_scratch:

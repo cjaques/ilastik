@@ -48,8 +48,6 @@ class OpSlic(Operator):
 
     def __init__(self, *args, **kwargs):
         super( OpSlic, self ).__init__(*args, **kwargs)
-        print 'OpSlic has been initialized'
-
 
     def setupOutputs(self):
         # check input shape and assign output

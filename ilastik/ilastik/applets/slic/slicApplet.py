@@ -27,7 +27,6 @@ class SlicApplet( StandardApplet ):
     """
     def __init__( self, workflow ):
 
-        print 'Initializing OpSlic'
         # Multi-image operator
         self._topLevelOperator = OpSlic(parent=workflow)
 
