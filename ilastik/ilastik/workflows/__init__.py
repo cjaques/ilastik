@@ -71,7 +71,7 @@ if ilastik.config.cfg.getboolean('ilastik', 'debug'):
     import examples.layerViewer
     import examples.thresholdMasking
     import examples.deviationFromMean
-    # import examples.dummy #CHRIS dummy new workflow
+    import examples.dummy #CHRIS dummy new workflow
     import mitochondriaSegmentation
     import examples.labeling
     import examples.connectedComponents

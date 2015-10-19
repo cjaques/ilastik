@@ -50,7 +50,7 @@ from ilastik.widgets.viewerControls import ViewerControls
 
 #===----------------------------------------------------------------------------------------------------------------===
 
-class LayerViewerGuiMetaclass(type(QWidget)):
+class SlicGuiMetaclass(type(QWidget)):
     """
     Custom metaclass to enable the _after_init function.
     """
@@ -61,11 +61,11 @@ class LayerViewerGuiMetaclass(type(QWidget)):
         """
         # Base class first. (type is our baseclass)
         # type.__call__ calls instance.__init__ internally
-        instance = super(LayerViewerGuiMetaclass, cls).__call__(*args,**kwargs)
+        instance = super(SlicGuiMetaclass, cls).__call__(*args,**kwargs)
         instance._after_init()
         return instance
 
-class LayerViewerGui(QWidget):
+class SlicGui(QWidget):
     """
     Implements an applet GUI whose central widget is a VolumeEditor
     and whose layer controls simply contains a layer list widget.
@@ -74,7 +74,7 @@ class LayerViewerGui(QWidget):
     Provides: Central widget (viewer), View Menu, and Layer controls
     Provides an EMPTY applet drawer widget.  Subclasses should replace it with their own applet drawer.
     """
-    __metaclass__ = LayerViewerGuiMetaclass
+    __metaclass__ = SlicGuiMetaclass
     
     ###########################################
     ### AppletGuiInterface Concrete Methods ###
@@ -97,7 +97,7 @@ class LayerViewerGui(QWidget):
         self._stopped = True
 
         # Remove all layers
-        self.layerstack.clear()
+        self.layerstack.clear() 
 
         # Unsubscribe to all signals
         for fn in self.__cleanup_fns:
@@ -119,7 +119,7 @@ class LayerViewerGui(QWidget):
         :param additionalMonitoredSlots: Optional.  Can be used to add additional slots to the set of viewable layers (all slots from the top-level operator are already monitored).
         :param centralWidgetOnly: If True, provide only a central widget without drawer or viewer controls.
         """
-        super(LayerViewerGui, self).__init__()
+        super(SlicGui, self).__init__()
 
         self._stopped = False
         self._initialized = False
@@ -193,7 +193,7 @@ class LayerViewerGui(QWidget):
     def showEvent(self, event):
         if self._need_update:
             self.updateAllLayers()
-        super( LayerViewerGui, self ).showEvent(event)
+        super( SlicGui, self ).showEvent(event)
 
     def setupLayers( self ):
         """
@@ -203,8 +203,9 @@ class LayerViewerGui(QWidget):
         """
         layers = []
         for multiLayerSlot in self.observedSlots:
-            for j, slot in enumerate(multiLayerSlot):                
-                has_space = slot.meta.axistags and slot.meta.axistags.axisTypeCount(vigra.AxisType.Space) > 2
+            for j, slot in enumerate(multiLayerSlot):
+                has_space = slot.meta.axistags and slot.meta.axistags.axisTypeCount(vigra.AxisType.Space) > 1 # TODO CHris - before, the condition was > 2, but want to work on 2D images...
+
                 if slot.ready() and has_space:
                     layer = self.createStandardLayerFromSlot(slot)
                     
@@ -378,7 +379,7 @@ class LayerViewerGui(QWidget):
 
         # Ask for the updated layer list (usually provided by the subclass)
         newGuiLayers = self.setupLayers()
-        
+
         for layer in newGuiLayers:
             assert not filter( lambda l: l is layer, self.layerstack ), \
                 "You are attempting to re-use a layer ({}).  " \
@@ -398,8 +399,7 @@ class LayerViewerGui(QWidget):
         newDataShape = self.determineDatashape()
         if newDataShape is not None and self.editor.dataShape != newDataShape:
             self.editor.dataShape = newDataShape
-            
-            print 'New data shape ... ' , newDataShape           
+            print ' On passe ici!!   ----- ', newDataShape
             # Find the xyz midpoint
             midpos5d = [x/2 for x in newDataShape]
             
@@ -459,7 +459,6 @@ class LayerViewerGui(QWidget):
             for i, slot in enumerate(provider):
                 if newDataShape is None:
                     newDataShape = self.getVoluminaShapeForSlot(slot)
-        print 'Debug ---- ', newDataShape
         return newDataShape
 
     @threadRouted
@@ -508,6 +507,7 @@ class LayerViewerGui(QWidget):
             # Disconnect it so it can be garbage collected.
             op5.Input.disconnect()
             op5.cleanUp()
+        print 'DEBUG --', shape
         return shape
 
     def initViewerControlUi(self):

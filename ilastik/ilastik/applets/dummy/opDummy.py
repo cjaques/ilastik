@@ -3,8 +3,13 @@ from lazyflow.rtype import SubRegion
 import numpy as np 
 from ilastik.utility import MultiLaneOperatorABC, OperatorSubView
 
-# for debug
+# for debugging
 import sys
+import sys
+sys.path.append('/Users/Chris/Code/python_tests/slic/')
+import slic # as slic
+import numpy, vigra
+
 
 class OpDummy(Operator):
     """
@@ -54,33 +59,55 @@ class OpDummy(Operator):
         # ======================= INFOS =================================
         # total size of the input image : self.Input[0].meta.shape
 
-        # Cache computation
-        if (self.alreadyCachedInput == False):
-            self.InputShape = self.Input[0].meta.shape 
-            start = (0, 0, 0,0)
-            stop = (self.InputShape[0], self.InputShape[1], self.InputShape[2],self.InputShape[3]) # pourquoi c = 3 ? (axis = zyxc)
-            totalROI = SubRegion(self.Output,start=tuple(start), stop=tuple(stop)) 
-            self.CachedInput[:] =  self.Input[0].get(totalROI).wait() # cache input, probablement pas necessaire ----> meilleur moyen d'acceder au images?
-            self.CachedResults = np.resize(self.CachedResults,self.InputShape)
-            self.CachedResults[:] = np.zeros(self.InputShape)
-            self.alreadyCachedInput = True
-        
-        results = np.zeros(self.InputShape)
-        # Results already computed ? --> will depend on roi ---> store ROIs in memory 
-        if roi in self.ComputedROIs:
-            results[roi.start[0]:roi.stop[0], roi.start[1]:roi.stop[1], roi.start[2]:roi.stop[2],roi.start[3]:roi.stop[3]] = self.getCachedResults(roi)   #better way to index arrays. 
-        else:
-            results[roi.start[0]:roi.stop[0], roi.start[1]:roi.stop[1], roi.start[2]:roi.stop[2],roi.start[3]:roi.stop[3]] = self.computeResults(roi) 
-            if results is not None : # Fixme, this condition will always be true. 
-                self.ComputedROIs.append(roi)
+        if(slot == self.Mean):
+            region = self.Input[0].get(roi).wait()
+            result = numpy.zeros( region.shape,dtype=numpy.float32)
 
-        # Scale
-        result[:] *= self.ScalingFactor.value
+            result = slic.ArgsTest(region,region.shape[0],region.shape[1])
+            # print 'SLIC code executed ---=---'
+            # print 'Newval ------'
+            # print newVal.shape
+            # print newVal[(10,10,0)]
+            # print 'Res  ------  '
+            # print region.shape
+            # print region[(10,10,0)]
+            # # result = numpy.array(region.shape)
+            # r2 = Request ( partial(slic.ComputeSlicXD,region))
+            # result = r1.wait()
+        else: 
+            result=self.Input
+        # slic.ComputeSlicXD(region) #, result) 
 
-        # Add constant offset
-        result[:] += self.Offset.value
-        
+
         return result
+
+        # # Cache computation
+        # if (self.alreadyCachedInput == False):
+        #     self.InputShape = self.Input[0].meta.shape 
+        #     start = (0, 0, 0,0)
+        #     stop = (self.InputShape[0], self.InputShape[1], self.InputShape[2],self.InputShape[3]) # pourquoi c = 3 ? (axis = zyxc)
+        #     totalROI = SubRegion(self.Output,start=tuple(start), stop=tuple(stop)) 
+        #     self.CachedInput[:] =  self.Input[0].get(totalROI).wait() # cache input, probablement pas necessaire ----> meilleur moyen d'acceder au images?
+        #     self.CachedResults = np.resize(self.CachedResults,self.InputShape)
+        #     self.CachedResults[:] = np.zeros(self.InputShape)
+        #     self.alreadyCachedInput = True
+        
+        # results = np.zeros(self.InputShape)
+        # # Results already computed ? --> will depend on roi ---> store ROIs in memory 
+        # if roi in self.ComputedROIs:
+        #     results[roi.start[0]:roi.stop[0], roi.start[1]:roi.stop[1], roi.start[2]:roi.stop[2],roi.start[3]:roi.stop[3]] = self.getCachedResults(roi)   #better way to index arrays. 
+        # else:
+        #     results[roi.start[0]:roi.stop[0], roi.start[1]:roi.stop[1], roi.start[2]:roi.stop[2],roi.start[3]:roi.stop[3]] = self.computeResults(roi) 
+        #     if results is not None : # Fixme, this condition will always be true. 
+        #         self.ComputedROIs.append(roi)
+
+        # # Scale
+        # result[:] *= self.ScalingFactor.value
+
+        # # Add constant offset
+        # result[:] += self.Offset.value
+        
+        # return result
         
 
     def computeBoxMean(self, xC,yC,zC):

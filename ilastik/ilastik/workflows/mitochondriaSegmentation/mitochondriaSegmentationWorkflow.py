@@ -94,7 +94,7 @@ class MitochondriaSegmentationWorkflow(Workflow):
         SLIC applet, based on RK's C++ implementation
         """
         print 'Creating SLIC segmentation applet'
-        return SlicApplet( self) # "SlicSegmentation" )
+        return SlicApplet( self,"SlicSegmentation" )
 
  
     def connectLane(self, laneIndex):

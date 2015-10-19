@@ -46,7 +46,9 @@ import Queue
 import logging
 logger = logging.getLogger(__name__)
 
-
+# debugging 
+import traceback
+import pdb
 
 class RenderTask(_WorkItem):
     def __init__(self, f, prefetch, timestamp,
@@ -229,8 +231,15 @@ class Tiling(object):
         self.name = name
         self.data2scene = data2scene
 
+        # DEBUG PART... to remove
+        print '------------- DEBUG -------------------'
+        # traceback.print_stack() # To debug ... CHRIs
+        # pdb.set_trace()
+        print '[TILING.py] - numPatches = ', numPatches, ' overlap = ', self._overlap
+
     @property
     def data2scene(self):
+        # traceback.print_stack()
         return self._data2scene
 
     @data2scene.setter

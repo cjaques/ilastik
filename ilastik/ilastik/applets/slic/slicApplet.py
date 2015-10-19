@@ -20,20 +20,20 @@
 ###############################################################################
 from ilastik.applets.base.standardApplet import StandardApplet
 from opSlic import OpSlic
+from slicSerializer import SlicSerializer
 
 class SlicApplet( StandardApplet ):
     """
     This applet runs the SLIC algorithm to compute superpixels or supervoxels
     """
-    def __init__( self, workflow ):
+    def __init__( self, workflow,projectFileGroupName ):
 
         # Multi-image operator
         self._topLevelOperator = OpSlic(parent=workflow)
-        # test comment, to see how git works.
         
         # Base class
         super(SlicApplet, self).__init__("Slic", workflow)
-        self._serializableItems = []
+        self._serializableItems = [SlicSerializer(self._topLevelOperator,projectFileGroupName)]
 
     # @property
     # def topLevelOperator(self):

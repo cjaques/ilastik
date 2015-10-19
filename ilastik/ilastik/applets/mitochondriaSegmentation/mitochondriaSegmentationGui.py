@@ -32,8 +32,8 @@ from PyQt4.QtCore import Qt, pyqtSlot, QVariant
 from PyQt4.QtGui import QMessageBox, QColor, QIcon, QMenu, QDialog, QVBoxLayout, QDialogButtonBox, QListWidget, QListWidgetItem
 
 # HCI
-from volumina.api import LazyflowSource, AlphaModulatedLayer, GrayscaleLayer, ColortableLayer
-from volumina.utility import ShortcutManager, PreferencesManager
+# from volumina.api import LazyflowSource, AlphaModulatedLayer, GrayscaleLayer, ColortableLayer
+# from volumina.utility import ShortcutManager, PreferencesManager
 
 from lazyflow.utility import PathComponents
 from lazyflow.roi import slicing_to_string
@@ -48,11 +48,11 @@ from ilastik.shell.gui.iconMgr import ilastikIcons
 from ilastik.applets.labeling.labelingGui import LabelingGui
 from ilastik.applets.dataSelection.dataSelectionGui import DataSelectionGui, H5VolumeSelectionDlg
 
-try:
-    from volumina.view3d.volumeRendering import RenderingManager
-except ImportError:
-    print "No 3d viewer"
-    pass
+# try:  # Debug test, remove volumina
+#     from volumina.view3d.volumeRendering import RenderingManager
+# except ImportError:
+#     print "No 3d viewer"
+#     pass
 
 # Loggers
 logger = logging.getLogger(__name__)

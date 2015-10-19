@@ -25,6 +25,7 @@ from lazyflow.request import Request
 from ilastik.applets.base.applet import DatasetConstraintError
 from ilastik.utility import MultiLaneOperatorABC, OperatorSubView
 
+import traceback
 
 import sys
 sys.path.append('/Users/Chris/Code/python_tests/slic/')
@@ -43,6 +44,7 @@ class OpSlic(Operator):
     Cubeness = InputSlot(optional=True)
     
     #OtherInput = InputSlot(optional=True)
+
 
     SegmentedImage = OutputSlot(level=1) # How to set its shape , only 1 image with "pixel" value being equal to cluster center number? level = 1?
 
@@ -70,27 +72,16 @@ class OpSlic(Operator):
     def execute(self, slot, subindex, roi, result):
         """
         Compute SLIC superpixel segmentation
-        """
+        """        
         if slot==self.SegmentedImage:
             
             region = self.InputVolume[0].get(roi).wait()
             result = numpy.zeros( region.shape,dtype=numpy.float32)
 
-            result = slic.ArgsTest(region,region.shape[0],region.shape[1])
-            # print 'SLIC code executed ---=---'
-            # print 'Newval ------'
-            # print newVal.shape
-            # print newVal[(10,10,0)]
-            # print 'Res  ------  '
-            # print region.shape
-            # print region[(10,10,0)]
-            # # result = numpy.array(region.shape)
-            # r2 = Request ( partial(slic.ComputeSlicXD,region))
-            # result = r1.wait()
+            result = slic.ArgsTest(region,region.shape[0],region.shape[1], self.SuperPixelSize.value ,self.Cubeness.value)
+            
         else: 
             result=self.InputVolume
-        # slic.ComputeSlicXD(region) #, result) 
-
 
         return result
 
@@ -101,6 +92,7 @@ class OpSlic(Operator):
         
         # All inputs affect all outputs, so every image is dirty now
         for oslot in self.SegmentedImage:
+            roi = slice(None) # the whole image
             oslot.setDirty( roi )
 
 

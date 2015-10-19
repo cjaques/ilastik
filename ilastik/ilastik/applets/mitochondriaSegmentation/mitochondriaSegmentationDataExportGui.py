@@ -22,7 +22,7 @@ from PyQt4.QtGui import QColor
 
 from lazyflow.operators.generic import OpMultiArraySlicer2
 
-from volumina.api import LazyflowSource, AlphaModulatedLayer, ColortableLayer
+# from volumina.api import LazyflowSource, AlphaModulatedLayer, ColortableLayer
 
 from ilastik.utility import bind
 from ilastik.applets.dataExport.dataExportGui import DataExportGui, DataExportLayerViewerGui
