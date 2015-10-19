@@ -29,7 +29,8 @@ class SlicApplet( StandardApplet ):
 
         # Multi-image operator
         self._topLevelOperator = OpSlic(parent=workflow)
-
+        # test comment, to see how git works.
+        
         # Base class
         super(SlicApplet, self).__init__("Slic", workflow)
         self._serializableItems = []
