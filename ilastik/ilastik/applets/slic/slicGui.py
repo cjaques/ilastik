@@ -67,10 +67,6 @@ class SlicGui(LayerViewerGui):
     def updateOperatorSuperPixelSize(self, SuperPixelSize):
         self.topLevelOperatorView.SuperPixelSize.setValue(SuperPixelSize)
     
-    # @threadRouted
-    # def updateAllLayers(self, slot=None): #overload to avoid tiles.
-    #     self._need_update = False
-    
     def getAppletDrawerUi(self):
         return self._drawer
 

@@ -29,19 +29,12 @@ class SlicApplet( StandardApplet ):
     def __init__( self, workflow,projectFileGroupName ):
 
         # Multi-image operator
-        self._topLevelOperator = OpSlic(parent=workflow)
+        self._topLevelOperator = OpSlic(parent=workflow) #OpSlic(parent=workflow)
         
         # Base class
         super(SlicApplet, self).__init__("Slic", workflow)
-        self._serializableItems = [SlicSerializer(self._topLevelOperator,projectFileGroupName)]
+        self._serializableItems = []#SlicSerializer(self._topLevelOperator,projectFileGroupName)]
 
-    # @property
-    # def topLevelOperator(self):
-    #     return self._topLevelOperator
-
-    # @property
-    # def singleLaneOperatorClass(self):
-    #     return OpSlic
     @property
     def topLevelOperator(self):
         return self._topLevelOperator

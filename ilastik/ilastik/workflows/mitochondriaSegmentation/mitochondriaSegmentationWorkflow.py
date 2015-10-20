@@ -101,10 +101,8 @@ class MitochondriaSegmentationWorkflow(Workflow):
         print '[MitochondriaSegmentation] connectLane '
         opDataSelectionView = self.dataSelectionApplet.topLevelOperator.getLane(laneIndex)
         opSlicView = self.slicApplet.topLevelOperator.getLane(laneIndex)
-        
         # Connect top-level operators                                                                                                                 
         opSlicView.InputVolume.connect( opDataSelectionView.Image )
-        # opSlicView.OtherInput.connect( opDataSelectionView.ImageGroup[1] )
 
     def handleAppletStateUpdateRequested(self): 
         """
