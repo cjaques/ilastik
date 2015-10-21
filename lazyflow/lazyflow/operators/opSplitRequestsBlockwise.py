@@ -52,7 +52,7 @@ class OpSplitRequestsBlockwise(Operator):
         """
         super( OpSplitRequestsBlockwise, self ).__init__(*args, **kwargs)
         self._always_request_full_blocks = always_request_full_blocks
-        print 'ON EST LA  ------------- ', always_request_full_blocks
+
     def setupOutputs(self):
         self.Output.meta.assignFrom( self.Input.meta )
         self.Output.meta.ideal_blockshape = tuple(numpy.minimum(self.BlockShape.value, self.Input.meta.shape))

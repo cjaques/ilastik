@@ -18,8 +18,10 @@
 # on the ilastik web site at:
 #		   http://ilastik.org/license.html
 ###############################################################################
+import os
 from ilastik.applets.base.standardApplet import StandardApplet
 from opSlic import OpSlic
+from opCachedSlic import OpCachedSlic
 from slicSerializer import SlicSerializer
 
 class SlicApplet( StandardApplet ):
@@ -29,11 +31,20 @@ class SlicApplet( StandardApplet ):
     def __init__( self, workflow,projectFileGroupName ):
 
         # Multi-image operator
-        self._topLevelOperator = OpSlic(parent=workflow) #OpSlic(parent=workflow)
+        # Debug variable, will disappear
+        use_cache =  (os.environ.get('USE_SLIC_CACHED',False) == "1")
+        
+        if(use_cache):
+            self._topLevelOperator = OpCachedSlic(parent=workflow)
+        else:
+            self._topLevelOperator = OpSlic(parent=workflow) 
         
         # Base class
         super(SlicApplet, self).__init__("Slic", workflow)
         self._serializableItems = []#SlicSerializer(self._topLevelOperator,projectFileGroupName)]
+    
+    def resetComputed(self):
+        self._topLevelOperator.resetComputed()
 
     @property
     def topLevelOperator(self):

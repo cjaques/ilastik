@@ -82,7 +82,6 @@ class OperatorSubView(object):
         self.__innerOp = None # Used if op is an OperatorWrapper
 
         self.__referenceSlotName = None
-
         self.inputs = InputDict(self)
         for slot in op.inputs.values():
             if slot.level >= 1 and not slot.nonlane:

@@ -396,11 +396,10 @@ class LayerViewerGui(QWidget):
         # If the datashape changed, tell the editor
         # FIXME: This may not be necessary now that this gui doesn't handle the multi-image case...
         newDataShape = self.determineDatashape()
-        print 'DEBUG --- 11', newDataShape
+        
         if newDataShape is not None and self.editor.dataShape != newDataShape:
             self.editor.dataShape = newDataShape
-            
-            print 'New data shape ... ---- 22' , newDataShape           
+                 
             # Find the xyz midpoint
             midpos5d = [x/2 for x in newDataShape]
             
@@ -460,7 +459,6 @@ class LayerViewerGui(QWidget):
             for i, slot in enumerate(provider):
                 if newDataShape is None:
                     newDataShape = self.getVoluminaShapeForSlot(slot)
-        print 'Debug ---- ', newDataShape
         return newDataShape
 
     @threadRouted

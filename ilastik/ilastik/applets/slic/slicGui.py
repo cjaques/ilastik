@@ -6,6 +6,7 @@ from ilastik.utility.gui import ThreadRouter, threadRouted
 
 from ilastik.utility import bind
 
+
 class SlicGui(LayerViewerGui):
     """
     """
@@ -38,7 +39,7 @@ class SlicGui(LayerViewerGui):
         self._drawer.CubenessSpinBox.valueChanged.connect(self.updateOperatorCubeness)
 
         def updateDrawerFromOperator():
-            SuperPixelSize, Cubeness = (20,5)
+            SuperPixelSize, Cubeness = (40,5)
 
             if self.topLevelOperatorView.SuperPixelSize.ready():
                 SuperPixelSize = self.topLevelOperatorView.SuperPixelSize.value
@@ -66,12 +67,14 @@ class SlicGui(LayerViewerGui):
         
     def updateOperatorSuperPixelSize(self, SuperPixelSize):
         self.topLevelOperatorView.SuperPixelSize.setValue(SuperPixelSize)
+        self.topLevelOperatorView.ResetComputed()
     
     def getAppletDrawerUi(self):
         return self._drawer
 
     def updateOperatorCubeness(self, Cubeness):
         self.topLevelOperatorView.Cubeness.setValue(Cubeness)
+        self.topLevelOperatorView.ResetComputed()
     
     def setupLayers(self):
         """
@@ -80,17 +83,26 @@ class SlicGui(LayerViewerGui):
         """
         layers = []
 
+        # Debug variable, will disappear
+        use_cache =  (os.environ.get('USE_SLIC_CACHED',False) == "1")
+        
         # Show the Output data
-        outputImageSlot = self.topLevelOperatorView.SegmentedImage
-        if outputImageSlot.ready():
+        if(use_cache):  # different names to make sure there is no confusion between cache/no cache algorithms
+            outputImageSlot = self.topLevelOperatorView.OutputImages 
+        else:
+            outputImageSlot = self.topLevelOperatorView.SegmentedImage
+        if outputImageSlot.ready(): # NOT the case with Cached Slic, why?
             outputLayer = self.createStandardLayerFromSlot( outputImageSlot )
             outputLayer.name = "SegmentedImage"
             outputLayer.visible = True
-            outputLayer.opacity = 0.8
+            outputLayer.opacity = 0.4
             layers.append(outputLayer)
             
         # Show the raw input data as a convenience for the user
-        inputImageSlot = self.topLevelOperatorView.InputVolume
+        if(use_cache):
+            inputImageSlot = self.topLevelOperatorView.InputImages
+        else:
+            inputImageSlot = self.topLevelOperatorView.InputVolume
         if inputImageSlot.ready():
             inputLayer = self.createStandardLayerFromSlot( inputImageSlot )
             inputLayer.name = "Input"

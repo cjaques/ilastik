@@ -3,6 +3,7 @@
 # from 
 ###############################################################################
 import sys
+import os
 import copy
 import argparse
 import logging
@@ -72,7 +73,10 @@ class MitochondriaSegmentationWorkflow(Workflow):
         self._applets.append(self.projectMetadataApplet)
         self._applets.append(self.dataSelectionApplet)
         self._applets.append(self.slicApplet)
-    #     logger.warn("Unused command-line args: {}".format( unused_args ))
+    
+        # Debug variable, will disappear
+        self.use_cache =  (os.environ.get('USE_SLIC_CACHED',False) == "1")
+
 
     def createDataSelectionApplet(self):
         """
@@ -93,16 +97,18 @@ class MitochondriaSegmentationWorkflow(Workflow):
         """
         SLIC applet, based on RK's C++ implementation
         """
-        print 'Creating SLIC segmentation applet'
-        return SlicApplet( self,"SlicSegmentation" )
+        return SlicApplet( self, "SlicSegmentation" )
 
  
     def connectLane(self, laneIndex):
         print '[MitochondriaSegmentation] connectLane '
         opDataSelectionView = self.dataSelectionApplet.topLevelOperator.getLane(laneIndex)
         opSlicView = self.slicApplet.topLevelOperator.getLane(laneIndex)
-        # Connect top-level operators                                                                                                                 
-        opSlicView.InputVolume.connect( opDataSelectionView.Image )
+        # Connect top-level operators  
+        if(self.use_cache):                                                                                                                   
+            opSlicView.InputImages.connect( opDataSelectionView.Image )
+        else:
+            opSlicView.InputVolume.connect( opDataSelectionView.Image )
 
     def handleAppletStateUpdateRequested(self): 
         """

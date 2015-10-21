@@ -20,15 +20,17 @@
 ###############################################################################
 from lazyflow.graph import Operator, InputSlot, OutputSlot
 from functools import partial
-from lazyflow import operatorWrapper
+from lazyflow import operatorWrapper, roi as ROI
 from lazyflow.request import Request
 from lazyflow.operators import OpArrayCache
+from lazyflow.operatorWrapper import OperatorWrapper
+from lazyflow.rtype import SubRegion
 
 from ilastik.applets.base.applet import DatasetConstraintError
 from ilastik.utility import MultiLaneOperatorABC, OperatorSubView
 
 import traceback
-
+import os
 import sys
 sys.path.append('/Users/Chris/Code/python_tests/slic/') #TODO CHRis - automate this (integrate slic code in Ilastik?)
 import slic 
@@ -44,21 +46,18 @@ class OpSlic(Operator):
     InputVolume = InputSlot(level=1) # level = 1 so that input can be multiple images 
     SuperPixelSize = InputSlot(optional=True)
     Cubeness = InputSlot(optional=True)
+
+    SegmentedImage = OutputSlot(level=1) 
     
-    #OtherInput = InputSlot(optional=True)
-
-    SegmentedImage = OutputSlot(level=1) #level=1 usually... How to set its shape , only 1 image with "pixel" value being equal to cluster center number? level = 1?
-    Output = OutputSlot(level=0)
-
     def __init__(self, *args, **kwargs):
         super( OpSlic, self ).__init__(*args, **kwargs)
+        self._computed = False 
 
+    def ResetComputed(self):
+        self._computed = False
 
-    def setupOutputs(self):
-        # check input shape and assign output
-        # shape = self.InputVolume.meta.shape
-        
-        # Copy the meta info from each input to the corresponding output --> this has to be done to display data    
+    def setupOutputs(self):   
+        # Copy the meta info from each input to the corresponding output
         self.SegmentedImage.resize( len(self.InputVolume) )
         for index, islot in enumerate(self.InputVolume):
             self.SegmentedImage[index].meta.assignFrom(islot.meta)
@@ -70,19 +69,19 @@ class OpSlic(Operator):
         self.InputVolume.notifyInserted( markAllOutputsDirty )
         self.InputVolume.notifyRemoved( markAllOutputsDirty )
 
-
     def execute(self, slot, subindex, roi, result):
         """
         Compute SLIC superpixel segmentation
         """        
         if slot==self.SegmentedImage:
-            # print '------------------- DEBUG ---------------- IN OPSLIC ----'
-            # traceback.print_stack()
-            region = self.InputVolume[0].get(roi).wait()
-            # result = numpy.zeros( region.shape,dtype=numpy.float32)
-            # print 'Region shape to SLIC ' ,region.shape
-            result = slic.ArgsTest(region,region.shape[0],region.shape[1], self.SuperPixelSize.value ,self.Cubeness.value)
+            if(self._computed == False): # self._computed = true means we already computed SLIC on the whole volume
+                shape = self.InputVolume[0].meta.shape
+                newRoi = SubRegion(self.InputVolume[0], start=tuple( (0,0,0) ),stop=tuple( (shape[0],shape[1],shape[2]) )) # newRoi is the whole input
+                region = self.InputVolume[0].get(newRoi).wait()
+                self.resultCache = slic.ArgsTest(region,region.shape[0],region.shape[1], self.SuperPixelSize.value ,self.Cubeness.value)
+                self._computed = True
 
+            result = self.resultCache[roi.start[0]:roi.stop[0],roi.start[1]:roi.stop[1],roi.start[2]:roi.stop[2]]
         else: 
             result=self.InputVolume
 
@@ -108,7 +107,7 @@ class OpSlic(Operator):
         Add an image lane to the top-level operator.
         """
         numLanes = len(self.InputVolume)
-        assert numLanes == laneIndex, "Image lanes must be appended."        
+        # assert numLanes == laneIndex, "Image lanes must be appended."  # this happen not to be the case with cache... why?
         self.InputVolume.resize(numLanes+1)
         self.SegmentedImage.resize(numLanes+1)
         
