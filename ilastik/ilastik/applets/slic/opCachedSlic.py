@@ -54,7 +54,7 @@ class OpCachedSlic(Operator):
         self._opSlicCache = OperatorWrapper(OpArrayCache,parent=self,promotedSlotNames=['Input']) 
         # Cleanup of wrapped cache doesn't work 
         self._opSlicCache.Input.connect(self._opSlic.SegmentedImage)
-
+        # Have to call setupOutputs, otherwise the function isn't called... why?
         self.setupOutputs()
 
     def execute(self, slot, subindex, roi, result):

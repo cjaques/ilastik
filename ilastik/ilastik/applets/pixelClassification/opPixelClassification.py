@@ -33,7 +33,7 @@ from lazyflow.operators import OpValueCache, OpTrainClassifierBlocked, OpClassif
                                OpSlicedBlockedArrayCache, OpMultiArraySlicer2, \
                                OpPixelOperator, OpMaxChannelIndicatorOperator, OpCompressedUserLabelArray
 
-from lazyflow.classifiers import ParallelVigraRfLazyflowClassifierFactory  # TODO : Chris - creer nouvel operateur Lazyflow du paper
+from lazyflow.classifiers import ParallelVigraRfLazyflowClassifierFactory
 
 #ilastik
 from ilastik.applets.base.applet import DatasetConstraintError
