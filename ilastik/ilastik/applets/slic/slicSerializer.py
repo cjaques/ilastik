@@ -6,7 +6,8 @@ class SlicSerializer(AppletSerializer):
     """
     def __init__(self, operator, projectFileGroupName):
         slots = [SerialSlot(operator.SuperPixelSize, selfdepends=True),
-                 SerialSlot(operator.Cubeness, selfdepends=True)]
+                 SerialSlot(operator.Cubeness, selfdepends=True),
+                 SerialSlot(operator.MaxIter,selfdepends=True)]
         
         super(SlicSerializer, self).__init__(projectFileGroupName,
                                                          slots=slots)

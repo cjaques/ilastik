@@ -33,7 +33,7 @@ class MitochondriaSegmentationWorkflow(Workflow):
     DATA_ROLE_RAW = 0
     DATA_ROLE_PREDICTION_MASK = 1
     
-    EXPORT_NAMES = ['Probabilities', 'Simple Segmentation', 'Uncertainty', 'Features'] # TODO : is Features really necessary or enough?
+    EXPORT_NAMES = ['Probabilities', 'Simple Segmentation', 'Uncertainty', 'Features'] 
     
     @property
     def applets(self):
@@ -101,14 +101,13 @@ class MitochondriaSegmentationWorkflow(Workflow):
 
  
     def connectLane(self, laneIndex):
-        print '[MitochondriaSegmentation] connectLane '
         opDataSelectionView = self.dataSelectionApplet.topLevelOperator.getLane(laneIndex)
         opSlicView = self.slicApplet.topLevelOperator.getLane(laneIndex)
         # Connect top-level operators  
         if(self.use_cache):                                                                                                                   
             opSlicView.InputImages.connect( opDataSelectionView.Image )
         else:
-            opSlicView.InputVolume.connect( opDataSelectionView.Image )
+            opSlicView.Input.connect( opDataSelectionView.Image )
 
     def handleAppletStateUpdateRequested(self): 
         """

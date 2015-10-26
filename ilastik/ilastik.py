@@ -76,10 +76,6 @@ def main():
     # Single threaded mode
     os.environ["LAZYFLOW_THREADS"] = "0" # better put this here, so that when loading project, taken into account
     
-    # To make debug of Slic applet easier
-    # If the next line is uncommented, cached slic operator is used (doesn't work yet)
-    os.environ["USE_SLIC_CACHED"] = "1"
-
     #parsed_args.headless = True
     #parsed_args.new_project = '/tmp/emptyproj.ilp'
     #parsed_args.workflow = "Pixel Classification"

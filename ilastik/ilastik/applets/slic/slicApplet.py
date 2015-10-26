@@ -20,8 +20,7 @@
 ###############################################################################
 import os
 from ilastik.applets.base.standardApplet import StandardApplet
-from opSlic import OpSlic
-from opCachedSlic import OpCachedSlic
+from opSlic import OpCachedSlic
 from slicSerializer import SlicSerializer
 
 class SlicApplet( StandardApplet ):
@@ -29,26 +28,14 @@ class SlicApplet( StandardApplet ):
     This applet runs the SLIC algorithm to compute superpixels or supervoxels
     """
     def __init__( self, workflow,projectFileGroupName ):
-
-        # Multi-image operator
-        # Debug variable, will disappear
-        use_cache =  (os.environ.get('USE_SLIC_CACHED',False) == "1")
-        
-        if(use_cache):
-            self._topLevelOperator = OpCachedSlic(parent=workflow)
-        else:
-            self._topLevelOperator = OpSlic(parent=workflow) 
         
         # Base class
         super(SlicApplet, self).__init__("Slic", workflow)
-        self._serializableItems = []#SlicSerializer(self._topLevelOperator,projectFileGroupName)]
-    
-    def resetComputed(self):
-        self._topLevelOperator.resetComputed()
+        self._serializableItems = [SlicSerializer(self.topLevelOperator,projectFileGroupName)]
 
     @property
-    def topLevelOperator(self):
-        return self._topLevelOperator
+    def singleLaneOperatorClass(self):
+        return OpCachedSlic
     
     @property
     def singleLaneGuiClass(self):
