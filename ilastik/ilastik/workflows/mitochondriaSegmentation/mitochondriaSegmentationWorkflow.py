@@ -50,7 +50,6 @@ class MitochondriaSegmentationWorkflow(Workflow):
         self.stored_classifer = None
         self._applets = []
         self._workflow_cmdline_args = workflow_cmdline_args
-
         
         # Applets for training (interactive) workflow 
         self.projectMetadataApplet = ProjectMetadataApplet()
