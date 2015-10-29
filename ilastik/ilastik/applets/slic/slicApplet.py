@@ -20,7 +20,8 @@
 ###############################################################################
 import os
 from ilastik.applets.base.standardApplet import StandardApplet
-from opSlic import OpCachedSlic
+# from opSlic import OpCachedSlic
+from opSlic3d import OpCachedSlic3D
 from slicSerializer import SlicSerializer
 
 class SlicApplet( StandardApplet ):
@@ -35,7 +36,7 @@ class SlicApplet( StandardApplet ):
 
     @property
     def singleLaneOperatorClass(self):
-        return OpCachedSlic
+        return OpCachedSlic3D
     
     @property
     def singleLaneGuiClass(self):
