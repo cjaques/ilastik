@@ -16,31 +16,47 @@ import slic
 class OpSlic3D(Operator):
     Input = InputSlot()
     # These are the slic parameters.
-    # Here we give default values, but they can be changed.
+
     SuperPixelSize = InputSlot(value=10)
     Compactness = InputSlot(value=5.0)
     MaxIter = InputSlot(value=6)
     
     Output = OutputSlot()
-    
+    Boundaries = OutputSlot()
+
+
+    def SetBoundariesCallback(self, boundaries):
+        print 'In SetBoundariesCallback ... '
+        assert isinstance(boundaries, numpy.ndarray) , "The returned value to SetBoundariesCallback must be a numpy array"
+        print 'Out shape ', self.Output.meta.shape
+        print 'Bound shape ', boundaries.shape
+        # assert boundaries.shape == self.Output.meta.shape # make sure the shapes match
+        # self.Boundaries.value = boundaries[...,None] # sets boundaries
+
+
     def setupOutputs(self):
         self.Output.meta.assignFrom(self.Input.meta)
+        self.Boundaries.meta.assignFrom(self.Input.meta)
 
         tagged_shape = self.Input.meta.getTaggedShape()
         assert 'c' in tagged_shape, "We assume the image has an explicit channel axis."
-        assert tagged_shape.keys()[-1] == 'c', "This code assumes that channel is the LAST axis."
+        assert tagged_shape.keys()[-1] == 'c', "This code assumes that channel is the last axis."
         
         # Output will have exactly one channel, regardless of input channels
         tagged_shape['c'] = 1
         self.Output.meta.shape = tuple(tagged_shape.values())
+        self.Boundaries.meta.shape = tuple(tagged_shape.values())
+
+        # slic.SetPyCallback(self.SetBoundariesCallback) # sets the callback <-- to put somewhere else than setupOutputs?
     
     def execute(self, slot, subindex, roi, result):
-        input_data = self.Input(roi.start, roi.stop).wait() # slic_sp = 
-        # print 'Input data Shape ... : ', input_data[:,:,:,0].shape
-
-        slic_sp = slic.Compute3DSlic(input_data[:,:,:,0]) #input_data,int(self.SuperPixelSize.value), self.Compactness.value, int(self.MaxIter.value));
-        result[:] = input_data #slic_sp #[...,None] <--- Stuart added a None axis because his SLIC implementation returned a 2D+1 array, without C channel. 
-                                            # Ours returns the same size as input, thus 2D+1 with C channel.
+        input_data = self.Input(roi.start, roi.stop).wait()
+        # boundaries = numpy.ndarray(input_data.shape)
+        # numpy.copyto(boundaries, input_data, casting='same_kind', where=None)
+        slic_sp = slic.Compute3DSlic(input_data[:,:,:,0], int(self.SuperPixelSize.value),self.Compactness.value,int(self.MaxIter.value))   
+        # print 'Data after : ', data
+        result[:] = slic_sp[...,None] #<--- Add Channel axis
+        
     
     def propagateDirty(self, slot, subindex, roi):
         # For some operators, a dirty in one part of the image only causes changes in nearby regions.
@@ -56,12 +72,14 @@ class OpCachedSlic3D(Operator):
     name = "OpCachedSlic"
     category = "top-level"
 
-    Input = InputSlot() # level = 1 so that input can be multiple images 
+    Input = InputSlot() 
     SuperPixelSize = InputSlot(optional=True)
     Cubeness = InputSlot(optional=True)
     MaxIter = InputSlot(optional=True)
+
     Output = OutputSlot() # Result of the SLIC algorithm goes in these images
-    
+    Boundaries = OutputSlot()
+
     def __init__(self, *args, **kwargs):
         super( OpCachedSlic3D, self ).__init__(*args, **kwargs)
         
@@ -72,10 +90,10 @@ class OpCachedSlic3D(Operator):
         self.opSlic.MaxIter.connect(self.MaxIter)
         self.opSlic.Input.connect(self.Input) 
         
-        # OpSlicCache to cache results (operator Wrapper to promote OpSlicCache.input to level=1) 
         self.opSlicCache = OpBlockedArrayCache(parent=self)
         self.opSlicCache.Input.connect(self.opSlic.Output)
         self.Output.connect(self.opSlicCache.Output )
+        # self.Boundaries.connect(self.opSlic.Boundaries) # go through cache? shouldn't be necessary
 
     def setupOutputs(self):        
         # The cache is capable of requesting and storing results in small blocks,

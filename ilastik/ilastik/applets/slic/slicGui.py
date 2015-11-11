@@ -40,7 +40,7 @@ class SlicGui(LayerViewerGui):
         self._drawer.MaxIterSpinBox.valueChanged.connect(self.updateOperatorMaxIter)
 
         def updateDrawerFromOperator():
-            SuperPixelSize, Cubeness, MaxIter = (20,10, 10)
+            SuperPixelSize, Cubeness, MaxIter = (5,4, 10)
 
             if self.topLevelOperatorView.SuperPixelSize.ready():
                 SuperPixelSize = self.topLevelOperatorView.SuperPixelSize.value
@@ -90,6 +90,14 @@ class SlicGui(LayerViewerGui):
             outputLayer.visible = True
             outputLayer.opacity = 0.4
             layers.append(outputLayer)
+
+        # boundariesImageSlot = self.topLevelOperatorView.Boundaries
+        # if boundariesImageSlot.ready(): 
+        #     boundaryLayer = self.createStandardLayerFromSlot( boundariesImageSlot )
+        #     boundaryLayer.name = "Boundaries"
+        #     boundaryLayer.visible = True
+        #     boundaryLayer.opacity = 0.4
+        #     layers.append(boundaryLayer)
             
         
         inputImageSlot = self.topLevelOperatorView.Input 
