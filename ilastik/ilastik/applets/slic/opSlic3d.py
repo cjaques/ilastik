@@ -21,8 +21,8 @@ class OpSlic3D(Operator):
     Compactness = InputSlot(value=5.0)
     MaxIter = InputSlot(value=6)
     
-    Output = OutputSlot()
-    Boundaries = OutputSlot()
+    Output = OutputSlot(level=1)
+    # Boundaries = OutputSlot()
 
 
     def SetBoundariesCallback(self, boundaries):
@@ -43,7 +43,7 @@ class OpSlic3D(Operator):
         assert tagged_shape.keys()[-1] == 'c', "This code assumes that channel is the last axis."
         
         # Output will have exactly one channel, regardless of input channels
-        tagged_shape['c'] = 1
+        tagged_shape['c'] = 2
         self.Output.meta.shape = tuple(tagged_shape.values())
         self.Boundaries.meta.shape = tuple(tagged_shape.values())
 
@@ -77,8 +77,8 @@ class OpCachedSlic3D(Operator):
     Cubeness = InputSlot(optional=True)
     MaxIter = InputSlot(optional=True)
 
-    Output = OutputSlot() # Result of the SLIC algorithm goes in these images
-    Boundaries = OutputSlot()
+    Output = OutputSlot(level=1) # Result of the SLIC algorithm goes in these images
+    # Boundaries = OutputSlot()
 
     def __init__(self, *args, **kwargs):
         super( OpCachedSlic3D, self ).__init__(*args, **kwargs)
