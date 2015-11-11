@@ -15,47 +15,48 @@ import slic
 
 class OpSlic3D(Operator):
     Input = InputSlot()
+    
     # These are the slic parameters.
-
     SuperPixelSize = InputSlot(value=10)
     Compactness = InputSlot(value=5.0)
     MaxIter = InputSlot(value=6)
     
-    Output = OutputSlot(level=1)
-    # Boundaries = OutputSlot()
-
-
-    def SetBoundariesCallback(self, boundaries):
-        print 'In SetBoundariesCallback ... '
-        assert isinstance(boundaries, numpy.ndarray) , "The returned value to SetBoundariesCallback must be a numpy array"
-        print 'Out shape ', self.Output.meta.shape
-        print 'Bound shape ', boundaries.shape
-        # assert boundaries.shape == self.Output.meta.shape # make sure the shapes match
-        # self.Boundaries.value = boundaries[...,None] # sets boundaries
-
+    Output = OutputSlot()
+    Boundaries = OutputSlot()
 
     def setupOutputs(self):
         self.Output.meta.assignFrom(self.Input.meta)
         self.Boundaries.meta.assignFrom(self.Input.meta)
 
         tagged_shape = self.Input.meta.getTaggedShape()
+        boundaries_shape = self.Input.meta.getTaggedShape()
         assert 'c' in tagged_shape, "We assume the image has an explicit channel axis."
         assert tagged_shape.keys()[-1] == 'c', "This code assumes that channel is the last axis."
         
         # Output will have exactly one channel, regardless of input channels
-        tagged_shape['c'] = 2
+        tagged_shape['c'] = 1
+        boundaries_shape['c'] = 1
         self.Output.meta.shape = tuple(tagged_shape.values())
-        self.Boundaries.meta.shape = tuple(tagged_shape.values())
+        self.Boundaries.meta.shape = tuple(boundaries_shape.values())
 
         # slic.SetPyCallback(self.SetBoundariesCallback) # sets the callback <-- to put somewhere else than setupOutputs?
     
     def execute(self, slot, subindex, roi, result):
+        
         input_data = self.Input(roi.start, roi.stop).wait()
         # boundaries = numpy.ndarray(input_data.shape)
         # numpy.copyto(boundaries, input_data, casting='same_kind', where=None)
-        slic_sp = slic.Compute3DSlic(input_data[:,:,:,0], int(self.SuperPixelSize.value),self.Compactness.value,int(self.MaxIter.value))   
-        # print 'Data after : ', data
-        result[:] = slic_sp[...,None] #<--- Add Channel axis
+        if(slot is self.Output):
+            if len(input_data.shape) == 3 :
+                slic_sp = slic.Compute2DSlic(input_data, int(self.SuperPixelSize.value),self.Compactness.value,int(self.MaxIter.value))   
+                result[:] = slic_sp
+            elif len(input_data.shape) == 4 :
+                slic_sp = slic.Compute3DSlic(input_data[:,:,:,0], int(self.SuperPixelSize.value),self.Compactness.value,int(self.MaxIter.value))   
+                result[:] = slic_sp[...,None] #<--- Add Channel axis
+            else:
+                assert False, "Can't be here, dimensions of input array have to match 2 or 3 D "
+        else:
+            result = input_data
         
     
     def propagateDirty(self, slot, subindex, roi):
@@ -63,6 +64,15 @@ class OpSlic3D(Operator):
         # But for superpixel operators, changes in one corner can affect results in the opposite corner.
         # Therefore, everything is dirty.
         self.Output.setDirty()
+
+    def SetBoundariesCallback(self, boundaries):
+        print 'In SetBoundariesCallback ... '
+        assert isinstance(boundaries, numpy.ndarray) , "The returned value to SetBoundariesCallback must be a numpy array"
+        print 'Out shape ', self.Output.meta.shape
+        print 'Bound shape ', boundaries.shape
+        # assert boundaries.shape == self.Output.meta.shape # make sure the shapes match
+        self.Boundaries = boundaries[...,None] # sets boundaries
+
 
 class OpCachedSlic3D(Operator):
     """
@@ -77,8 +87,8 @@ class OpCachedSlic3D(Operator):
     Cubeness = InputSlot(optional=True)
     MaxIter = InputSlot(optional=True)
 
-    Output = OutputSlot(level=1) # Result of the SLIC algorithm goes in these images
-    # Boundaries = OutputSlot()
+    Output = OutputSlot() # Result of the SLIC algorithm goes in these images
+    Boundaries = OutputSlot()
 
     def __init__(self, *args, **kwargs):
         super( OpCachedSlic3D, self ).__init__(*args, **kwargs)
@@ -93,7 +103,10 @@ class OpCachedSlic3D(Operator):
         self.opSlicCache = OpBlockedArrayCache(parent=self)
         self.opSlicCache.Input.connect(self.opSlic.Output)
         self.Output.connect(self.opSlicCache.Output )
-        # self.Boundaries.connect(self.opSlic.Boundaries) # go through cache? shouldn't be necessary
+
+        self.opSlicBoundariesCache = OpBlockedArrayCache(parent=self)
+        self.opSlicBoundariesCache.Input.connect(self.opSlic.Boundaries)
+        self.Boundaries.connect(self.opSlicBoundariesCache.Output)
 
     def setupOutputs(self):        
         # The cache is capable of requesting and storing results in small blocks,
@@ -101,6 +114,7 @@ class OpCachedSlic3D(Operator):
         # Therefore, we set the 'block shape' to be the entire image -- there will only be one block stored in the cache.
         # (Note: The OpBlockedArrayCache.innerBlockshape slot is deprecated and ignored.)
         self.opSlicCache.outerBlockShape.setValue( self.Input.meta.shape )
+        self.opSlicBoundariesCache.outerBlockShape.setValue( self.Input.meta.shape )
 
         def markAllOutputsDirty( *args ):
             self.propagateDirty( self.Input, (), slice(None) )
