@@ -7,6 +7,8 @@ from lazyflow.operators import OpArrayCache, OpBlockedArrayCache
 from ilastik.applets.base.applet import DatasetConstraintError
 from ilastik.utility import MultiLaneOperatorABC, OperatorSubView
 
+import skimage.segmentation
+
 import traceback
 import numpy, vigra
 import sys
@@ -15,7 +17,7 @@ import slic
 
 class OpSlic3D(Operator):
     Input = InputSlot()
-    
+
     # These are the slic parameters.
     SuperPixelSize = InputSlot(value=10)
     Compactness = InputSlot(value=5.0)
@@ -23,40 +25,50 @@ class OpSlic3D(Operator):
     
     Output = OutputSlot()
     Boundaries = OutputSlot()
+    tempArray = numpy.array(tuple()) #list()
 
     def setupOutputs(self):
         self.Output.meta.assignFrom(self.Input.meta)
         self.Boundaries.meta.assignFrom(self.Input.meta)
 
+        
         tagged_shape = self.Input.meta.getTaggedShape()
-        boundaries_shape = self.Input.meta.getTaggedShape()
         assert 'c' in tagged_shape, "We assume the image has an explicit channel axis."
         assert tagged_shape.keys()[-1] == 'c', "This code assumes that channel is the last axis."
         
         # Output will have exactly one channel, regardless of input channels
         tagged_shape['c'] = 1
-        boundaries_shape['c'] = 1
         self.Output.meta.shape = tuple(tagged_shape.values())
-        self.Boundaries.meta.shape = tuple(boundaries_shape.values())
+        self.Boundaries.meta.shape = tuple(tagged_shape.values())
 
-        # slic.SetPyCallback(self.SetBoundariesCallback) # sets the callback <-- to put somewhere else than setupOutputs?
+        # self.tempArray = numpy.array( self.Output.meta.shape )
+
+        slic.SetPyCallback(self.SetBoundariesCallback) # sets the callback <-- to put somewhere else than setupOutputs?
     
     def execute(self, slot, subindex, roi, result):
         
         input_data = self.Input(roi.start, roi.stop).wait()
-        # boundaries = numpy.ndarray(input_data.shape)
-        # numpy.copyto(boundaries, input_data, casting='same_kind', where=None)
+
         if(slot is self.Output):
             if len(input_data.shape) == 3 :
-                slic_sp = slic.Compute2DSlic(input_data, int(self.SuperPixelSize.value),self.Compactness.value,int(self.MaxIter.value))   
+                slic_sp = slic.Compute2DSlic(input_data, 
+                                        int(self.SuperPixelSize.value),
+                                        self.Compactness.value,
+                                        int(self.MaxIter.value))   
                 result[:] = slic_sp
             elif len(input_data.shape) == 4 :
-                slic_sp = slic.Compute3DSlic(input_data[:,:,:,0], int(self.SuperPixelSize.value),self.Compactness.value,int(self.MaxIter.value))   
+                slic_sp = slic.Compute3DSlic(input_data[:,:,:,0], 
+                                        int(self.SuperPixelSize.value), 
+                                        self.Compactness.value, 
+                                        int(self.MaxIter.value))   
                 result[:] = slic_sp[...,None] #<--- Add Channel axis
             else:
-                assert False, "Can't be here, dimensions of input array have to match 2 or 3 D "
-        else:
-            result = input_data
+                assert False, "Can't be here, dimensions of input array have to match 2D or 3D "
+        elif slot is self.Boundaries:
+            if len(self.tempArray.shape) > 2: # this is necessary for program startup, in case tempArray isn't up to date yet.
+                result[:] = self.tempArray[:,:,:]
+            else:
+                result[:] = input_data[:]
         
     
     def propagateDirty(self, slot, subindex, roi):
@@ -66,13 +78,10 @@ class OpSlic3D(Operator):
         self.Output.setDirty()
 
     def SetBoundariesCallback(self, boundaries):
-        print 'In SetBoundariesCallback ... '
         assert isinstance(boundaries, numpy.ndarray) , "The returned value to SetBoundariesCallback must be a numpy array"
-        print 'Out shape ', self.Output.meta.shape
-        print 'Bound shape ', boundaries.shape
         # assert boundaries.shape == self.Output.meta.shape # make sure the shapes match
-        self.Boundaries = boundaries[...,None] # sets boundaries
-
+        self.tempArray.resize(self.Output.meta.shape)
+        self.tempArray[:] = boundaries[:,:,:,None] # sets boundaries
 
 class OpCachedSlic3D(Operator):
     """
