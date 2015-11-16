@@ -51,24 +51,30 @@ class OpSlic3D(Operator):
 
         if(slot is self.Output):
             if len(input_data.shape) == 3 :
-                slic_sp = slic.Compute2DSlic(input_data, 
-                                        int(self.SuperPixelSize.value),
-                                        self.Compactness.value,
-                                        int(self.MaxIter.value))   
+                slic_sp =    slic.Compute2DSlic(input_data, 
+                                                int(self.SuperPixelSize.value),
+                                                self.Compactness.value,
+                                                int(self.MaxIter.value))   
                 result[:] = slic_sp
             elif len(input_data.shape) == 4 :
-                slic_sp = slic.Compute3DSlic(input_data[:,:,:,0], 
-                                        int(self.SuperPixelSize.value), 
-                                        self.Compactness.value, 
-                                        int(self.MaxIter.value))   
+                slic_sp =    slic.Compute3DSlic(input_data[:,:,:,0], 
+                                                int(self.SuperPixelSize.value), 
+                                                self.Compactness.value, 
+                                                int(self.MaxIter.value))   
                 result[:] = slic_sp[...,None] #<--- Add Channel axis
+                # slic.CleanUp() # to free memory blocks to store volume
             else:
                 assert False, "Can't be here, dimensions of input array have to match 2D or 3D "
         elif slot is self.Boundaries:
-            if len(self.tempArray.shape) > 2: # this is necessary for program startup, in case tempArray isn't up to date yet.
+            if len(self.tempArray.shape) > 3 and len(input_data.shape) > 3:  # this is necessary for program startup, in case tempArray isn't up to date yet.
                 result[:] = self.tempArray[:,:,:]
             else:
                 result[:] = input_data[:]
+                # self.tempArray.resize(self.Output.meta.shape)
+
+        else: # for futur layers
+            print 'OpSlic3D : returning default, layer ', slot, ' not implemented yet'
+            result[:]  = input_data[:]
         
     
     def propagateDirty(self, slot, subindex, roi):
@@ -81,7 +87,7 @@ class OpSlic3D(Operator):
         assert isinstance(boundaries, numpy.ndarray) , "The returned value to SetBoundariesCallback must be a numpy array"
         # assert boundaries.shape == self.Output.meta.shape # make sure the shapes match
         self.tempArray.resize(self.Output.meta.shape)
-        self.tempArray[:] = boundaries[:,:,:,None] # sets boundaries
+        self.tempArray[:] = boundaries[:,:,:,None] 
 
 class OpCachedSlic3D(Operator):
     """
@@ -97,7 +103,7 @@ class OpCachedSlic3D(Operator):
     MaxIter = InputSlot(optional=True)
 
     Output = OutputSlot() # Result of the SLIC algorithm goes in these images
-    Boundaries = OutputSlot()
+    Boundaries = OutputSlot() # Boudaries between labels
 
     def __init__(self, *args, **kwargs):
         super( OpCachedSlic3D, self ).__init__(*args, **kwargs)
