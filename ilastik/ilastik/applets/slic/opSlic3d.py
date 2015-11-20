@@ -14,23 +14,23 @@ import numpy, vigra
 import sys
 sys.path.append('/Users/Chris/Code/python_tests/slic/') #TODO CHRis - automate this (integrate slic code in Ilastik?)
 import slic 
+import time
 
 class OpSlic3D(Operator):
     Input = InputSlot()
 
-    # These are the slic parameters.
+    # Slic parameters.
     SuperPixelSize = InputSlot(value=10)
     Compactness = InputSlot(value=5.0)
     MaxIter = InputSlot(value=6)
     
     Output = OutputSlot()
     Boundaries = OutputSlot()
-    tempArray = numpy.array(tuple()) #list()
+    tempArray = numpy.array(tuple()) 
 
     def setupOutputs(self):
         self.Output.meta.assignFrom(self.Input.meta)
         self.Boundaries.meta.assignFrom(self.Input.meta)
-
         
         tagged_shape = self.Input.meta.getTaggedShape()
         assert 'c' in tagged_shape, "We assume the image has an explicit channel axis."
@@ -40,8 +40,6 @@ class OpSlic3D(Operator):
         tagged_shape['c'] = 1
         self.Output.meta.shape = tuple(tagged_shape.values())
         self.Boundaries.meta.shape = tuple(tagged_shape.values())
-
-        # self.tempArray = numpy.array( self.Output.meta.shape )
 
         slic.SetPyCallback(self.SetBoundariesCallback) # sets the callback <-- to put somewhere else than setupOutputs?
     
@@ -57,20 +55,28 @@ class OpSlic3D(Operator):
                                                 int(self.MaxIter.value))   
                 result[:] = slic_sp
             elif len(input_data.shape) == 4 :
+                # start_time = time.time()
                 slic_sp =    slic.Compute3DSlic(input_data[:,:,:,0], 
                                                 int(self.SuperPixelSize.value), 
                                                 self.Compactness.value, 
                                                 int(self.MaxIter.value))   
+                # print("--- %s seconds ---" % (time.time() - start_time))
+                # start_time = time.time()
+                # slic_sp = skimage.segmentation.slic(input_data,
+                #                             n_segments=638,
+                #                             compactness=self.Compactness.value)  
+                # print("--- %s seconds ---" % (time.time() - start_time))
+
                 result[:] = slic_sp[...,None] #<--- Add Channel axis
-                # slic.CleanUp() # to free memory blocks to store volume
             else:
                 assert False, "Can't be here, dimensions of input array have to match 2D or 3D "
         elif slot is self.Boundaries:
-            if len(self.tempArray.shape) > 3 and len(input_data.shape) > 3:  # this is necessary for program startup, in case tempArray isn't up to date yet.
+            if len(self.tempArray.shape) > 3 and (self.tempArray.shape == input_data.shape):  # this is necessary when processing a new volume
                 result[:] = self.tempArray[:,:,:]
             else:
+                # if shapes don't match (when new volume is processed), return input.
+                # this layer will be updated later thanks to SetBoundariesCallback
                 result[:] = input_data[:]
-                # self.tempArray.resize(self.Output.meta.shape)
 
         else: # for futur layers
             print 'OpSlic3D : returning default, layer ', slot, ' not implemented yet'
@@ -81,13 +87,15 @@ class OpSlic3D(Operator):
         # For some operators, a dirty in one part of the image only causes changes in nearby regions.
         # But for superpixel operators, changes in one corner can affect results in the opposite corner.
         # Therefore, everything is dirty.
+        self.Boundaries.setDirty()
         self.Output.setDirty()
 
     def SetBoundariesCallback(self, boundaries):
         assert isinstance(boundaries, numpy.ndarray) , "The returned value to SetBoundariesCallback must be a numpy array"
-        # assert boundaries.shape == self.Output.meta.shape # make sure the shapes match
-        self.tempArray.resize(self.Output.meta.shape)
+        self.tempArray.resize(boundaries[:,:,:,None].shape)
         self.tempArray[:] = boundaries[:,:,:,None] 
+        # Updated self.Boundaries, update display with setDirty.
+        self.Boundaries.setDirty() # this doesn't cause the display to be updated on the first time...why?
 
 class OpCachedSlic3D(Operator):
     """
