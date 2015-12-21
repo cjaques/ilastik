@@ -40,7 +40,7 @@ class SlicGui(LayerViewerGui):
         self._drawer.MaxIterSpinBox.valueChanged.connect(self.updateOperatorMaxIter)
 
         def updateDrawerFromOperator():
-            SuperPixelSize, Cubeness, MaxIter = (10,10, 5)
+            SuperPixelSize, Cubeness, MaxIter = (15,10, 6)
 
             if self.topLevelOperatorView.SuperPixelSize.ready():
                 SuperPixelSize = self.topLevelOperatorView.SuperPixelSize.value

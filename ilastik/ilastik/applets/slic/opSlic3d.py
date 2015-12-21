@@ -9,12 +9,10 @@ from ilastik.utility import MultiLaneOperatorABC, OperatorSubView
 
 import skimage.segmentation
 
-import traceback
+import sys, traceback, time
 import numpy, vigra
-import sys
-sys.path.append('/Users/Chris/Code/python_tests/slic/') #TODO CHRis - automate this (integrate slic code in Ilastik?)
+sys.path.append('/Users/Chris/Code/cvlabRepo/slic/') #TODO CHRis - automate this (integrate slic code in Ilastik?)
 import slic 
-import time
 
 class OpSlic3D(Operator):
     Input = InputSlot()
@@ -26,7 +24,7 @@ class OpSlic3D(Operator):
     
     Output = OutputSlot()
     Boundaries = OutputSlot()
-    tempArray = numpy.array(tuple()) 
+    tempArray = numpy.array((10,10,10)) #tuple()) 
 
     def setupOutputs(self):
         self.Output.meta.assignFrom(self.Input.meta)
@@ -71,6 +69,10 @@ class OpSlic3D(Operator):
             else:
                 assert False, "Can't be here, dimensions of input array have to match 2D or 3D "
         elif slot is self.Boundaries:
+            # print 'Updating self.Boundaries'
+            # print 'Slot status : ', slot.ready()
+            # traceback.print_stack()
+            # print '-------------------------------------'
             if len(self.tempArray.shape) > 3 and (self.tempArray.shape == input_data.shape):  # this is necessary when processing a new volume
                 result[:] = self.tempArray[:,:,:]
             else:

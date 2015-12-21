@@ -537,7 +537,6 @@ class CoupledRectangleElement(object):
         and the functionality of the resizable rectangle Item.
         Keeps the two functionality separated
 
-
         :param x: initial position scene coordinates
         :param y: initial position scene coordinates
         :param h: initial height
@@ -555,14 +554,13 @@ class CoupledRectangleElement(object):
         self._graph=inputSlot.operator.graph
         self._inputSlot=inputSlot #input slot which connect to the sub array
 
-
         self.boxLabel=None #a reference to the label in the labellist model
         self._initConnect()
 
         #self.rectItem.color=qcolor
 
     def _initConnect(self):
-        #print "initializing ...", self.getStart(),self.getStop()
+        # print "initializing ...", self.getStart(),self.getStop()
 
         #Operator changes
         self._opsub.Input.connect(self._inputSlot)
@@ -573,7 +571,9 @@ class CoupledRectangleElement(object):
         #Signalling when the ractangle is moved
         self._rectItem.Signaller.signalHasMoved.connect(self._updateTextWhenChanges)
         self._rectItem.Signaller.signalHasResized.connect(self._updateTextWhenChanges)
-        self._updateTextWhenChanges()
+        # the next line had to be commented, otherwise it triggers "execute" of predictions, while classifier isn't ready
+        # self._updateTextWhenChanges()
+
 
     #@mainthreadonly
     @pyqtSlot()
@@ -589,24 +589,21 @@ class CoupledRectangleElement(object):
         #FIXME: Workaround: when the array is resized over the border of the image scene the
         # region get a wrong size
         try:
-            subarray=self.getSubRegion()
-
+            subarray=self.getSubRegion() # when not calling from a connected Operator, this throws an error 'slot not ready'
+            
             #self.current_sum= self.opsum.outputs["Output"][:].wait()[0]
             value=0
             if subarray!=None:
                 value=np.sum(subarray)
 
             #print "Resetting to a new value ",value,self.boxLabel
-
             self._rectItem.updateText("%.1f"%(value))
-
             if self.boxLabel!=None:
                 from PyQt4.QtCore import QString
                 self.boxLabel.density=QString("%.1f"%value)
         except Exception,e:
             import warnings
             warnings.warn("Warning: invalid subregion", RuntimeWarning)
-
 
 
     def getOpsub(self):
@@ -646,7 +643,7 @@ class CoupledRectangleElement(object):
         oldstart=self.getStart()
         oldstop=self.getStop()
 
-        # print "Start = %s , Stop = %s"%(oldstart,oldstop)
+        # print "Getting subregion, Start = %s , Stop = %s"%(oldstart,oldstop)
 
         start=[]
         stop=[]
@@ -660,8 +657,8 @@ class CoupledRectangleElement(object):
         self._opsub.Roi.disconnect()
         self._opsub.Roi.setValue([ tuple(start), tuple(stop)] )
 
-
-        return self._opsub.outputs["Output"][:].wait()
+        tmp = self._opsub.outputs["Output"][:].wait()
+        return np.copy(tmp)
 
     @property
     def color(self):
@@ -921,18 +918,28 @@ class BoxController(QObject):
     def getCurrentActiveBox(self):
         pass
 
+    def getBoxCount(self):
+        return len(self._currentBoxesList)
+
+    def getBoxesCoordinates(self):
+        l = []
+        for box in self._currentBoxesList :
+            tl = box._rectItem.topLeftDataPos()
+            br = box._rectItem.bottomRightDataPos()
+
+            pos = {'x':tl[0], 'y':tl[1], 'w':br[0]-tl[0], 'h':br[1]-tl[1]}
+            l.append(pos)
+        return l
+
 
     def addNewBox(self,pos5Dstart,pos5Dstop):
         modifiers=QApplication.keyboardModifiers()
         if modifiers == Qt.ControlModifier: #add stuff
             return
 
-        for el  in self.scene.selectedItems(): #retun if there is an handle on the scene at that position
+        for el  in self.scene.selectedItems(): #retun if there is a handle on the scene at that position
             if isinstance(el, ResizeHandle): return
 
-#
-#         print "Start = ",pos5Dstart,
-#         print "Stop =", pos5Dstop
         oldstart=pos5Dstart[1:3]
         oldstop=pos5Dstop[1:3]
         start=[]
@@ -942,27 +949,18 @@ class BoxController(QObject):
             stop.append(np.maximum(s1,s2))
 
 
-
-#         itemsall1=self.scene.items(QPointF(*pos5Dstart[1:3]))
-#         itemsall1 =filter(lambda el: isinstance(el, ResizeHandle), itemsall1)
-#         itemsall2=self.scene.items(QPointF(*pos5Dstop[1:3]))
-#         itemsall2 =filter(lambda el: isinstance(el, ResizeHandle), itemsall2)
-#         itemsall=itemsall1+itemsall2
-#         print itemsall
-
-
-
         h=stop[1]-start[1]
         w=stop[0]-start[0]
         if h*w<9: return #too small
 
         rect=CoupledRectangleElement(start[0],start[1],h,w,self.connectionInput,editor = self._editor, scene=self.scene,parent=self.scene.parent())
+        # link inputs 
+        rect._initConnect()
+
         rect.setZValue(len(self._currentBoxesList))
         rect.setColor(self.currentColor)
         #self.counter-=1
         self._currentBoxesList.append(rect)
-
-
 
         newRow=self.boxListModel.rowCount()
         box = BoxLabel( "Box%d"%newRow, self.currentColor)
@@ -979,7 +977,7 @@ class BoxController(QObject):
         box.existenceChanged.emit()
         rect.boxLabel=box
         box.isFixedChanged.connect(rect._rectItem.fixSelf)
-        rect._updateTextWhenChanges()
+        # rect._updateTextWhenChanges()
 
         self.currentColor=self._getNextBoxColor()
 

@@ -19,4 +19,5 @@
 #		   http://ilastik.org/license.html
 ###############################################################################
 from countingApplet import CountingApplet
+from countingArtetaApplet import CountingArtetaApplet 
 from countingDataExportApplet import *

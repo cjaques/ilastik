@@ -580,6 +580,7 @@ class SVR(object):
         if type(boxConstraints) is dict:
             boxConstraints["boxFeatures"] = self.normalize(boxConstraints["boxFeatures"])
         numFeatures = img.shape[1]
+        print 'Chris debug - boxConstraint : ',boxConstraints
         if self._method == "RandomForest":
             from sklearn.ensemble import RandomForestRegressor as RFR
             

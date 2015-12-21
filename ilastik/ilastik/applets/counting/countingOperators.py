@@ -23,7 +23,7 @@ import logging
 logger = logging.getLogger(__name__)
 traceLogger = logging.getLogger("TRACE." + __name__)
 import numpy as np
-import time
+import time, sys
 import copy
 import importlib
 from functools import partial
@@ -33,11 +33,10 @@ from lazyflow.request import Request, RequestPool
 from lazyflow.utility import traceLogged
 from lazyflow.operators import OpPixelOperator
 
+from lazyflow.operators.imgFilterOperators import OpGaussianSmoothing
 from ilastik.applets.counting.countingsvr import SVR
 
 
-
-from lazyflow.operators.imgFilterOperators import OpGaussianSmoothing
 
 class OpLabelPreviewer(OpGaussianSmoothing):
     name = "LabelPreviewer"
@@ -51,9 +50,6 @@ class OpLabelPreviewerRefactored(Operator):
 
 
 
-
-
-
 def checkOption(reqlist):
     for req in reqlist:
         try:
@@ -61,7 +57,6 @@ def checkOption(reqlist):
         except:
             return False
     return True
-
 
 
 class OpTrainCounter(Operator):
@@ -163,7 +158,6 @@ class OpTrainCounter(Operator):
         featMatrix=[]
         labelsMatrix=[]
         tagList = []
-
         
         #result[0] = self._svr
 
@@ -285,12 +279,14 @@ class OpTrainCounter(Operator):
 
             boxConstraintList = []
             boxConstraints = None
+            print 'Are boxConstraints ready?'
             if self.BoxConstraintRois.ready() and self.BoxConstraintValues.ready():
                 for i, slot in enumerate(zip(self.BoxConstraintRois,self.BoxConstraintValues)):
                     for constr, val in zip(slot[0].value, slot[1].value):
                         boxConstraintList.append((i, constr, val))
                 if len(boxConstraintList) > 0:
                     boxConstraints = self.constructBoxConstraints(boxConstraintList)
+                print 'Yes ... ', boxConstraints
 
             params = self._svr.get_params() 
             try:
@@ -366,8 +362,11 @@ class OpPredictCounter(Operator):
     description = "Predict on multiple images"
     category = "Learning"
 
-    inputSlots = [InputSlot("Image"),InputSlot("Classifier"),InputSlot("LabelsCount",stype='integer')]
-    outputSlots = [OutputSlot("PMaps")]
+    inputSlots = [  InputSlot("Image"),
+                    InputSlot("Classifier"),
+                    InputSlot("LabelsCount",stype='integer')]
+                    
+    outputSlots = [ OutputSlot("PMaps")]
 
     def setupOutputs(self):
         nlabels=self.inputs["LabelsCount"].value
