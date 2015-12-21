@@ -11,16 +11,16 @@ class CountingArtetaApplet(StandardApplet):
         self._topLevelOperator = OpCountingArteta(parent=workflow)
         super(CountingArtetaApplet, self).__init__(name=name, workflow=workflow)
 
-        # self._serializableItems = [CountingSerializer(self._topLevelOperator, projectFileGroupName)]   # Legacy (v0.5) importer
-        # self.predictionSerializer = self._serializableItems[0]
+        self._serializableItems = [CountingSerializer(self._topLevelOperator, projectFileGroupName)]   # Legacy (v0.5) importer
+        self.predictionSerializer = self._serializableItems[0]
 
     @property
     def topLevelOperator(self):
         return self._topLevelOperator
 
-    # @property
-    # def dataSerializers(self):
-    #     return self._serializableItems
+    @property
+    def dataSerializers(self):
+        return self._serializableItems
 
     @property
     def singleLaneGuiClass(self):

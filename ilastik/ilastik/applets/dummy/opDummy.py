@@ -6,7 +6,7 @@ from ilastik.utility import MultiLaneOperatorABC, OperatorSubView
 # for debugging
 import sys
 import sys
-sys.path.append('/Users/Chris/Code/python_tests/slic/')
+sys.path.append('/Users/Chris/Code/cvlabRepo/slic/')
 import slic # as slic
 import numpy, vigra
 
