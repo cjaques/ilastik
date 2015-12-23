@@ -1,7 +1,7 @@
 from ilastik.applets.base.standardApplet import StandardApplet
 
 from Arteta.opCountingArteta import OpCountingArteta
-from countingSerializer import CountingSerializer
+from countingSerializer import CountingArtetaSerializer
 
 class CountingArtetaApplet(StandardApplet):
     def __init__(self,
@@ -11,7 +11,7 @@ class CountingArtetaApplet(StandardApplet):
         self._topLevelOperator = OpCountingArteta(parent=workflow)
         super(CountingArtetaApplet, self).__init__(name=name, workflow=workflow)
 
-        self._serializableItems = [CountingSerializer(self._topLevelOperator, projectFileGroupName)]   # Legacy (v0.5) importer
+        self._serializableItems = [CountingArtetaSerializer(self._topLevelOperator, projectFileGroupName)]   # Legacy (v0.5) importer
         self.predictionSerializer = self._serializableItems[0]
 
     @property

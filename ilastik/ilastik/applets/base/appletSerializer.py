@@ -619,6 +619,90 @@ class SerialPickledValueSlot(SerialSlot):
         slot.setValue(pickle.loads(val))
 
 
+class SerialCountingArtetaSlot(SerialSlot):
+    """For saving a counting classifier, from the Lempitsky-Arteta algorithm """
+    def __init__(self, slot, cache, inslot=None, name=None,
+                 default=None, depends=None, selfdepends=True):
+        super(SerialCountingArtetaSlot, self).__init__(
+            slot, inslot, name, "wrapper{:04d}", default, depends, selfdepends
+        )
+        self.cache = cache
+        if self.name is None:
+            self.name = slot.name
+        if self.subname is None:
+            self.subname = "wrapper{:04d}"
+
+        # We want to bind to the INPUT, not Output:
+        # - if the input becomes dirty, we want to make sure the cache is deleted
+        # - if the input becomes dirty and then the cache is reloaded, we'll save the classifier.
+        self._bind(cache.Input)
+
+    def _serialize(self, group, name, slot):
+        if self.cache._dirty:
+            return
+
+        classifier = self.cache.Output.value
+
+        # Classifier can be None if there isn't any training data yet.
+        if classifier is None:
+            return
+
+        # Due to non-shared hdf5 dlls, vigra can't write directly to
+        # our open hdf5 group. Instead, we'll use vigra to write the
+        # classifier to a temporary file.
+        tmpDir = tempfile.mkdtemp()
+        cachePath = os.path.join(tmpDir, 'tmp_classifier_cache.h5').replace('\\', '/')
+        # for i, forest in enumerate(classifier_forests):
+        targetname = '{0}/{1}'.format(name, self.subname.format(0))
+        classifier.writeHDF5(cachePath, targetname)
+
+        # Open the temp file and copy to our project group
+        with h5py.File(cachePath, 'r') as cacheFile:
+            group.copy(cacheFile[name], name)
+
+        os.remove(cachePath)
+        os.rmdir(tmpDir)
+
+    def deserialize(self, group):
+        """
+        Have to override this to ensure that dirty is always set False.
+        """
+        super(SerialCountingSlot, self).deserialize(group)
+        self.dirty = False
+
+    def _deserialize(self, classifierGroup, slot):
+        # Due to non-shared hdf5 dlls, vigra can't read directly
+        # from our open hdf5 group. Instead, we'll copy the
+        # classfier data to a temporary file and give it to vigra.
+        tmpDir = tempfile.mkdtemp()
+        cachePath = os.path.join(tmpDir, 'tmp_classifier_cache.h5').replace('\\', '/')
+        with h5py.File(cachePath, 'w') as cacheFile:
+            cacheFile.copy(classifierGroup, self.name)
+
+        try:
+            forests = []
+            for name, forestGroup in sorted(classifierGroup.items()):
+                targetname = '{0}/{1}'.format(self.name, name)
+                #forests.append(vigra.learning.RandomForest(cachePath, targetname))
+                from ilastik.applets.counting.countingsvr import SVR
+                forests.append(SVR.load(cachePath, targetname))
+        except:
+            warnings.warn( "Wasn't able to deserialize the saved classifier.  "
+                           "It will need to be retrainied" )
+            return
+        finally:
+            os.remove(cachePath)
+            os.rmdir(tmpDir)
+
+        # Now force the classifier into our classifier cache. The
+        # downstream operators (e.g. the prediction operator) can
+        # use the classifier without inducing it to be re-trained.
+        # (This assumes that the classifier we are loading is
+        # consistent with the images and labels that we just
+        # loaded. As soon as training input changes, it will be
+        # retrained.)
+        self.cache.forceValue(numpy.array(forests))
+
 class SerialCountingSlot(SerialSlot):
     """For saving a random forest classifier."""
     def __init__(self, slot, cache, inslot=None, name=None,

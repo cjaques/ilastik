@@ -241,7 +241,7 @@ class CountingArtetaGui(LabelingGui):
         self.density5d=OpReorderAxes(graph=self.op.graph, parent=self.op.parent) 
 
         self.density5d.Input.connect(self.op.Density)
-        self.boxController=BoxController(mainwin.editor,self.density5d.Output,self.labelingDrawerUi.boxListModel)
+        self.boxController=BoxController(mainwin.editor,self.density5d.Output,self.labelingDrawerUi.boxListModel, self._updateCoords)
         self.boxInterpreter=BoxInterpreter(mainwin.editor.navInterpret,mainwin.editor.posModel,self.boxController,mainwin.centralWidget())
 
         self.navigationInterpreterDefault=self.editor.navInterpret
@@ -272,10 +272,9 @@ class CountingArtetaGui(LabelingGui):
         self.labelingDrawerUi.boxListView.resetEmptyMessage("no boxes defined yet")
         # self.labelingDrawerUi.SVROptions.currentIndexChanged.connect(self._updateSVROptions)
         
-
-
         self.labelingDrawerUi.SigmaBox.valueChanged.connect(self._updateSigma)
         self.labelingDrawerUi.MaxDepthBox.valueChanged.connect(self._updateMaxDepth)
+        self.op.opTrain.BoxConstraintRois.setValue(self.boxController._currentBoxesList) # fixme: private field?
 
         #=======================================================================
         # Operators to Gui connections
@@ -341,7 +340,9 @@ class CountingArtetaGui(LabelingGui):
 
             #set opTrain from parameters
             self.op.opTrain.initInputs(params)
+            #input boxes coordinates
 
+            # self._updateCoords()
 
 
         else: 
@@ -358,6 +359,7 @@ class CountingArtetaGui(LabelingGui):
         if _ind == -1:
             self.labelingDrawerUi.AlgorithmList.setCurrentIndex(0)
             # self._updateSVROptions()
+            # self._updateCoords()
         else:
             self.labelingDrawerUi.AlgorithmList.setCurrentIndex(_ind)
 
@@ -418,6 +420,11 @@ class CountingArtetaGui(LabelingGui):
     def _updateEpsilon(self):
         self.op.opTrain.Epsilon.setValue(self.labelingDrawerUi.EpsilonBox.value())
 
+    def _updateCoords(self):
+        coords = self.boxController.getBoxesCoordinates()
+        # print 'Updating coords with ', coords
+        self.op.opTrain.BoxesCoords.setValue(coords)
+
     def _updateSVROptions(self):
         index = self.labelingDrawerUi.SVROptions.currentIndex()
         option = self.labelingDrawerUi.SVROptions.itemData(index).toPyObject()[0]
@@ -443,18 +450,21 @@ class CountingArtetaGui(LabelingGui):
         rois = constr["rois"]
         fixedClassifier = opTrain.fixClassifier.value
         assert len(vals) == len(rois)
-        if opTrain.Boxes.ready() and opTrain.BoxConstraintValues.ready():
-            if opTrain.BoxConstraintValues[id].value != vals or opTrain.Boxes[id].value != rois:
+        
+        if opTrain.BoxConstraintRois.ready() and opTrain.BoxConstraintValues.ready():
+
+            if opTrain.BoxConstraintValues[id].value != vals or opTrain.BoxConstraintRois[id].value != rois:
                 opTrain.fixClassifier.setValue(True)
                 # quickfix for already connected slot to [] 
-                if(opTrain.Boxes[id].connected() == True and opTrain.BoxConstraintValues[id].value == [] ):
-                    opTrain.Boxes[id].disconnect()
-                opTrain.Boxes[id].setValue(rois)
+                if(opTrain.BoxConstraintRois[id].connected() == True and opTrain.BoxConstraintValues[id].value == [] ):
+                    opTrain.BoxConstraintRois[id].disconnect()
+                opTrain.BoxConstraintRois[id].setValue(rois)
+        
                 #at this position so the change of a value can trigger a recomputation
                 opTrain.fixClassifier.setValue(fixedClassifier)
                 opTrain.BoxConstraintValues[id].setValue(vals)
 
-        #boxes = self.boxController._currentBoxesList
+
     def _changeViewBoxes(self, boxes):
         id = self.op.current_view_index()
         self.op.boxViewer.rois[id].setValue(boxes["rois"])
@@ -475,10 +485,10 @@ class CountingArtetaGui(LabelingGui):
                 boxCounter = boxCounter + 1
 
 
-        if op.Boxes.ready() and len(op.Boxes[idx].value) > 0:
+        if op.BoxConstraintRois.ready() and len(op.BoxConstraintRois[idx].value) > 0:
             #if fixed boxes are existent, make column visible
             self.labelingDrawerUi.boxListView._table.setColumnHidden(self.boxController.boxListModel.ColumnID.Fix, False)
-            for constr in zip(op.Boxes[idx].value, op.BoxConstraintValues[idx].value):
+            for constr in zip(op.BoxConstraintRois[idx].value, op.BoxConstraintValues[idx].value):
                 roi, val = constr
                 if type(roi) is not list or len(roi) is not 2:
                     continue
@@ -659,7 +669,7 @@ class CountingArtetaGui(LabelingGui):
                                                         inputLayer ) )
             layers.append(inputLayer)
 
-        # self.handleLabelSelectionChange()
+        # self._updateCoords()
         return layers
 
 
@@ -906,11 +916,12 @@ class CountingArtetaGui(LabelingGui):
 
         #self._labelControlUi.boxToolButton.setChecked(True)
 
-
     def _onBoxChanged(self,parentFun, mapf):
 
         parentFun()
         new = map(mapf, self.labelListData)
+
+
 
 
     def _changeInteractionMode( self, toolId ):
@@ -1589,3 +1600,4 @@ countingColorTable = [
     QColor(127.0,0.0,0.0,255.0).rgba(),
     QColor(127.0,0.0,0.0,255.0).rgba(),
     QColor(127.0,0.0,0.0,255.0).rgba()]
+

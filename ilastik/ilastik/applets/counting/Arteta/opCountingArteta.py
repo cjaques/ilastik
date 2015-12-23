@@ -130,8 +130,8 @@ class OpCountingArteta( Operator ):
 		self.opTrain = OpTrainArtetaCounter( parent=self, graph=self.graph )
 		self.opTrain.inputs['InputImages'].connect( self.InputImages)
 		self.opTrain.inputs['Labels'].connect( self.GetFore.Output)
-		self.opTrain.inputs['Boxes'].connect( self.BoxLabelInputs )
-		self.opTrain.inputs['Features'].connect( self.FeatureImages )  # FeatureImages
+		self.opTrain.inputs['BoxConstraintValues'].connect( self.opLabelPipeline.BoxOutput )
+		self.opTrain.inputs['Features'].connect( self.FeatureImages ) 
 		self.opTrain.inputs["nonzeroLabelBlocks"].connect( self.opLabelPipeline.nonzeroBlocks )
 		# self.opTrain.inputs['fixClassifier'].setValue( True )
 
@@ -239,13 +239,13 @@ class OpCountingArteta( Operator ):
 		numLanes = len(self.InputImages)
 		assert numLanes == laneIndex, "Image lanes must be appended."        
 		self.InputImages.resize(numLanes+1)
-		self.opTrain.Boxes.resize(numLanes + 1)
+		self.opTrain.BoxConstraintRois.resize(numLanes + 1)
 		self.opTrain.BoxConstraintValues.resize(numLanes + 1)
 		self.boxViewer.rois.resize(numLanes + 1)
 		
 	def removeLane(self, laneIndex, finalLength):
 		self.InputImages.removeSlot(laneIndex, finalLength)
-		self.opTrain.Boxes.removeSlot(laneIndex, finalLength)
+		self.opTrain.BoxConstraintRois.removeSlot(laneIndex, finalLength)
 		self.opTrain.BoxConstraintValues.removeSlot(laneIndex, finalLength)
 		self.boxViewer.rois.removeSlot(laneIndex, finalLength)
 
@@ -297,158 +297,156 @@ class OpCountingArteta( Operator ):
 				 .format( thisLaneTaggedShape['c'], validShape['c'] ) )
 
 class OpArtetaPredictionPipelineNoCache(Operator):
-    """
-    This contains only the cacheless parts of the prediction pipeline, for easy use in headless workflows.
-    """
-    InputImages = InputSlot()
-    FeatureImages = InputSlot()
-    # MaxLabel = InputSlot() # this slot is never set --> makes our Operator.Density not ready --> helps us, bug at launching otherwise --> why?
-    Classifier = InputSlot()
-    FreezePredictions = InputSlot()
-    PredictionsFromDisk = InputSlot( optional=True )
-    
-    HeadlessPredictionProbabilities = OutputSlot() # drange is 0.0 to 1.0
-    
-    OutputSum = OutputSlot()
+	"""
+	This contains only the cacheless parts of the prediction pipeline, for easy use in headless workflows.
+	"""
+	InputImages = InputSlot()
+	FeatureImages = InputSlot()
+	# MaxLabel = InputSlot() # this slot is never set --> makes our Operator.Density not ready --> helps us, bug at launching otherwise --> why?
+	Classifier = InputSlot()
+	FreezePredictions = InputSlot()
+	PredictionsFromDisk = InputSlot( optional=True )
+	
+	HeadlessPredictionProbabilities = OutputSlot() # drange is 0.0 to 1.0
+	
+	OutputSum = OutputSlot()
 
-    def __init__(self, *args, **kwargs):
-        super( OpArtetaPredictionPipelineNoCache, self ).__init__( *args, **kwargs )
+	def __init__(self, *args, **kwargs):
+		super( OpArtetaPredictionPipelineNoCache, self ).__init__( *args, **kwargs )
 
-        self.cacheless_predict = OpPredictArtetaCounter( parent=self )
-        self.cacheless_predict.name = "OpPredictCounter (Cacheless Path)"
-        self.cacheless_predict.inputs['Classifier'].connect(self.Classifier) 
-        self.cacheless_predict.inputs['Features'].connect(self.FeatureImages) # <--- Not from cache
-        self.cacheless_predict.inputs['Image'].connect(self.InputImages) # <--- Not from cache
-        # 
-        # self.cacheless_predict.inputs['LabelsCount'].connect(self.MaxLabel)
-        self.meaner = OpMean(parent = self)
-        self.meaner.Input.connect(self.cacheless_predict.PMaps)
-        self.HeadlessPredictionProbabilities.connect(self.meaner.Output)
+		self.cacheless_predict = OpPredictArtetaCounter( parent=self )
+		self.cacheless_predict.name = "OpPredictCounter (Cacheless Path)"
+		self.cacheless_predict.inputs['Classifier'].connect(self.Classifier) 
+		self.cacheless_predict.inputs['Features'].connect(self.FeatureImages) # <--- Not from cache
+		self.cacheless_predict.inputs['Image'].connect(self.InputImages) # <--- Not from cache
+		# 
+		# self.cacheless_predict.inputs['LabelsCount'].connect(self.MaxLabel)
+		self.meaner = OpMean(parent = self)
+		self.meaner.Input.connect(self.cacheless_predict.PMaps)
+		self.HeadlessPredictionProbabilities.connect(self.meaner.Output)
 
-        self.opVolumeSum = OpVolumeOperator(parent=self)
-        self.opVolumeSum.Input.connect(self.meaner.Output)
-        self.opVolumeSum.Function.setValue(numpy.sum)
+		self.opVolumeSum = OpVolumeOperator(parent=self)
+		self.opVolumeSum.Input.connect(self.meaner.Output)
+		self.opVolumeSum.Function.setValue(numpy.sum)
 
-        self.OutputSum.connect( self.opVolumeSum.Output )
+		self.OutputSum.connect( self.opVolumeSum.Output )
 
 
-    def setupOutputs(self):
-        pass
+	def setupOutputs(self):
+		pass
 
-    def execute(self, slot, subindex, roi, result):
-        assert False, "Shouldn't get here.  Output is assigned a value in setupOutputs()"
+	def execute(self, slot, subindex, roi, result):
+		assert False, "Shouldn't get here.  Output is assigned a value in setupOutputs()"
 
-    def propagateDirty(self, slot, subindex, roi):
-        # Our output changes when the input changed shape, not when it becomes dirty.
-        pass
+	def propagateDirty(self, slot, subindex, roi):
+		# Our output changes when the input changed shape, not when it becomes dirty.
+		pass
 
 class OpArtetaPredictionPipeline(OpArtetaPredictionPipelineNoCache):
-    """
-    This operator extends the cacheless prediction pipeline above with additional outputs for the GUI.
-    (It uses caches for these outputs, and has an extra input for cached features.)
-    """        
-    CachedFeatureImages = InputSlot()
+	"""
+	This operator extends the cacheless prediction pipeline above with additional outputs for the GUI.
+	(It uses caches for these outputs, and has an extra input for cached features.)
+	"""        
+	CachedFeatureImages = InputSlot()
 
-    PredictionProbabilities = OutputSlot()
-    CachedPredictionProbabilities = OutputSlot()
-    UncertaintyEstimate = OutputSlot()
+	PredictionProbabilities = OutputSlot()
+	CachedPredictionProbabilities = OutputSlot()
+	UncertaintyEstimate = OutputSlot()
 
-    def __init__(self, *args, **kwargs):
-        super(OpArtetaPredictionPipeline, self).__init__( *args, **kwargs )
+	def __init__(self, *args, **kwargs):
+		super(OpArtetaPredictionPipeline, self).__init__( *args, **kwargs )
 
-        # Prediction using CACHED features.
-        self.predict = OpPredictArtetaCounter( parent=self )
-        self.predict.name = "OpPredictArtetaCounter"
-        self.predict.inputs['Classifier'].connect(self.Classifier) 
-        self.predict.inputs['Image'].connect(self.InputImages)
-        self.predict.inputs['Features'].connect(self.CachedFeatureImages)
-        self.PredictionProbabilities.connect( self.predict.PMaps )
+		# Prediction using CACHED features.
+		self.predict = OpPredictArtetaCounter( parent=self )
+		self.predict.name = "OpPredictArtetaCounter"
+		self.predict.inputs['Classifier'].connect(self.Classifier) 
+		self.predict.inputs['Image'].connect(self.InputImages)
+		self.predict.inputs['Features'].connect(self.CachedFeatureImages)
+		self.PredictionProbabilities.connect( self.predict.PMaps )
 
-        # Prediction cache for the GUI
-        self.prediction_cache_gui = OpArrayCache( parent=self )
-        self.prediction_cache_gui.name = "prediction_cache_gui"
-        self.prediction_cache_gui.inputs["fixAtCurrent"].connect( self.FreezePredictions )
-        self.prediction_cache_gui.inputs["Input"].connect( self.predict.PMaps )
-        self.prediction_cache_gui.blockShape.setValue(128) #self.predict.PMaps.meta.shape)
-        
-        # Also provide each prediction channel as a separate layer (for the GUI) 
-        # Uncertainty not used yet.
-        self.opUncertaintyEstimator = OpEnsembleMargin( parent=self )
-        self.opUncertaintyEstimator.Input.connect( self.prediction_cache_gui.Output )
+		# Prediction cache for the GUI
+		self.prediction_cache_gui = OpArrayCache( parent=self )
+		self.prediction_cache_gui.name = "prediction_cache_gui"
+		self.prediction_cache_gui.inputs["fixAtCurrent"].connect( self.FreezePredictions )
+		self.prediction_cache_gui.inputs["Input"].connect( self.predict.PMaps )
+		
+		# Also provide each prediction channel as a separate layer (for the GUI) 
+		# Uncertainty not used yet.
+		self.opUncertaintyEstimator = OpEnsembleMargin( parent=self )
+		self.opUncertaintyEstimator.Input.connect( self.prediction_cache_gui.Output )
 
-        ## Cache the uncertainty so we get zeros for uncomputed points
-        self.opUncertaintyCache = OpArrayCache( parent=self )
-        self.opUncertaintyCache.name = "opUncertaintyCache"
-        self.opUncertaintyCache.blockShape.setValue(self.FeatureImages.meta.shape)
-        self.opUncertaintyCache.Input.connect( self.opUncertaintyEstimator.Output )
-        self.opUncertaintyCache.fixAtCurrent.connect( self.FreezePredictions )
-        self.UncertaintyEstimate.connect( self.opUncertaintyCache.Output )
-        
-        self.meaner = OpMean(parent = self)
-        self.meaner.Input.connect(self.prediction_cache_gui.Output)
+		## Cache the uncertainty so we get zeros for uncomputed points
+		self.opUncertaintyCache = OpArrayCache( parent=self )
+		self.opUncertaintyCache.name = "opUncertaintyCache"
+		self.opUncertaintyCache.blockShape.setValue(self.FeatureImages.meta.shape)
+		self.opUncertaintyCache.Input.connect( self.opUncertaintyEstimator.Output )
+		self.opUncertaintyCache.fixAtCurrent.connect( self.FreezePredictions )
+		self.UncertaintyEstimate.connect( self.opUncertaintyCache.Output )
+		
+		self.meaner = OpMean(parent = self)
+		self.meaner.Input.connect(self.prediction_cache_gui.Output)
 
-        self.precomputed_predictions_gui = OpPrecomputedInput( parent=self )
-        self.precomputed_predictions_gui.name = "precomputed_predictions_gui"
-        self.precomputed_predictions_gui.SlowInput.connect( self.meaner.Output )
-        self.precomputed_predictions_gui.PrecomputedInput.connect( self.PredictionsFromDisk )
-        self.CachedPredictionProbabilities.connect(self.precomputed_predictions_gui.Output)
-        # self.CachedPredictionProbabilities.connect(self.predict.PMaps ) # to debug outputs not ready
+		self.precomputed_predictions_gui = OpPrecomputedInput( parent=self )
+		self.precomputed_predictions_gui.name = "precomputed_predictions_gui"
+		self.precomputed_predictions_gui.SlowInput.connect( self.meaner.Output )
+		self.precomputed_predictions_gui.PrecomputedInput.connect( self.PredictionsFromDisk )
+		self.CachedPredictionProbabilities.connect(self.precomputed_predictions_gui.Output)
+		# self.CachedPredictionProbabilities.connect(self.predict.PMaps ) # to debug outputs not ready
 
-    def setupOutputs(self):
-    	# set cache block shape to input dimension -- not absolutely necessary though
-        self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape)
-
+	def setupOutputs(self):
+		# set cache block shape to input dimension
+		self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape)
 
 class OpPredictArtetaCounter(Operator):
-    name = "PredictArtetaCounter"
-    description = "Predict on multiple images, with Arteta objects counting implementation"
-    category = "Learning"
+	name = "PredictArtetaCounter"
+	description = "Predict on multiple images, with Arteta objects counting implementation"
+	category = "Learning"
 
-    inputSlots = [	InputSlot("Image"), 
-    				InputSlot("Classifier"),
-    				InputSlot("Features")]
+	inputSlots = [	InputSlot("Image"), 
+					InputSlot("Classifier"),
+					InputSlot("Features")]
 
-    outputSlots = [	OutputSlot("PMaps"),
-    				OutputSlot("OutputSum")] 
+	outputSlots = [	OutputSlot("PMaps"),
+					OutputSlot("OutputSum")] 
 	
-    def __init__(self, *args, **kwargs):
-        super(OpPredictArtetaCounter, self).__init__( *args, **kwargs )
-        # we have to set output as dirty 
-        self.outputs["PMaps"].setDirty()
+	def __init__(self, *args, **kwargs):
+		super(OpPredictArtetaCounter, self).__init__( *args, **kwargs )
+		# we have to set output as dirty 
+		self.outputs["PMaps"].setDirty()
 
 
-    def setupOutputs(self):
-        self.PMaps.meta.dtype = numpy.float32
-        self.PMaps.meta.axistags = copy.copy(self.Image.meta.axistags)
-        self.PMaps.meta.shape = self.Image.meta.shape # FIXME - make sure output works with color images (3D)
-        self.PMaps.meta.drange = (0.0, 1.0)
+	def setupOutputs(self):
+		self.PMaps.meta.dtype = numpy.float32
+		self.PMaps.meta.axistags = copy.copy(self.Image.meta.axistags)
+		self.PMaps.meta.shape = self.Image.meta.shape # FIXME - make sure output works with color images (3D)
+		self.PMaps.meta.drange = (0.0, 1.0)
 
-    def execute(self, slot, subindex, roi, result):
-    	print '[OpPredictArtetaCounter] - computing count predictions '
-        # t1 = time.time()
-        classifier =self.inputs["Classifier"][:].wait()
-        feats = self.inputs["Features"][:].wait()
-        mask = numpy.ones((feats.shape[:-1] + (1,) ),dtype=bool)
+	def execute(self, slot, subindex, roi, result):
+		print '[OpPredictArtetaCounter] - computing count predictions '
+		# t1 = time.time()
+		classifier =self.inputs["Classifier"][:].wait()
+		feats = self.inputs["Features"][:].wait()
+		mask = numpy.ones((feats.shape[:-1] + (1,) ),dtype=bool)
 
-        if classifier is None:
-            # Training operator may return 'None' if there was no data to train with
-            print '[OpPredictArtetaCounter] - No classifier supplied, returning zeros'
-            return numpy.zeros(numpy.subtract(roi.stop, roi.start), dtype=numpy.float32)[...]
+		if classifier is None:
+			# Training operator may return 'None' if there was no data to train with
+			print '[OpPredictArtetaCounter] - No classifier supplied, returning zeros'
+			return numpy.zeros(numpy.subtract(roi.stop, roi.start), dtype=numpy.float32)[...]
 
-       	# t2 = time.time()
+		# t2 = time.time()
 
-       	# actual prediction 
-       	res = classifier[0].predict_one(feats,mask)
-        
-        # t3 = time.time()
+		# actual prediction 
+		res = classifier[0].predict_one(feats,mask)
+		
+		# t3 = time.time()
 
-        result = res[...,None]
-        roiS = roiToSlice(roi.start,roi.stop)
-        
-        return result[roiS]
+		result = res[...,None]
+		roiS = roiToSlice(roi.start,roi.stop)
+		
+		return result[roiS]
 
-    def propagateDirty(self, slot, subindex, roi):
-        self.outputs["PMaps"].setDirty()
+	def propagateDirty(self, slot, subindex, roi):
+		self.outputs["PMaps"].setDirty()
 
 
 
@@ -464,8 +462,9 @@ class OpTrainArtetaCounter(Operator):
 				  InputSlot("nonzeroLabelBlocks", level=1,optional =True),
 				  InputSlot("Sigma", stype = "float", value=2.0), # Gaussian sigma
 				  InputSlot("MaxDepth", stype = "int", value=4), #KDTree parameter
-				  InputSlot("Boxes", level = 1, stype = "list", value = []),
-				  InputSlot("BoxConstraintValues", level = 1, stype = "list", value = [],optional=True),
+				  InputSlot("BoxConstraintRois", level = 1, stype = "list", value = [], optional=True),
+				  InputSlot("BoxConstraintValues", level = 1, stype = "list", value = [], optional=True),
+				  InputSlot("BoxesCoords", stype = "list", value = [], optional=True)
 				 ]
 	outputSlots = [OutputSlot("Classifier")]
 
@@ -488,33 +487,35 @@ class OpTrainArtetaCounter(Operator):
 			params = {"sigma": self.Sigma.value,"maxDepth" : self.MaxDepth.value}
 			self.arteta_pipeline.set_params(**params)
 		
-
 	def propagateDirty(self, slot, subindex, roi):
 		if slot is not self.inputs["fixClassifier"] and self.inputs["fixClassifier"].value == False:
 			self.outputs["Classifier"].setDirty()
 
 	def execute(self, slot, subindex, roi, result):
 		print '[OpTrainArtetaCounter] - training classifier'
+
 		# read inputs
 		feats = self.Features[0][:].wait() # FIXME : why doesn't it work with Features.get(roi) ?
 		labels = self.Labels[0][:].wait()
 		imgs = self.InputImages[0][:].wait()
+		boxes = self.BoxesCoords[:].wait()
+		
 		# compute mask based on boxes
 		shape = labels.shape 
 		mask = numpy.zeros((shape),dtype=bool)
-		mask = self.computeMask(mask,self.coords)
+		mask = self.computeMask(mask,boxes[0])
 		# train classifier
 		self.arteta_pipeline.fit(imgs, feats,labels,mask)
-
 		result = self.arteta_pipeline
 
 		return [result]
 
 
 	def setCoords(self,coords):
+		print 'Coords are : ', coords
 		if(self.coords != coords):
 			self.coords = coords
-			self.outputs['Classifier'].setDirty() # boxes modified, output is dirty now
+			self.outputs['Classifier'].setDirty() # boxes modified, output is dirty
 
 	def computeMask(self,mask, boxes):
 		# if two boxes overlap, nothing special happens, the area will be taken into account.

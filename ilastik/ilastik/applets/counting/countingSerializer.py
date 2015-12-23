@@ -270,6 +270,65 @@ class CountingSerializer(AppletSerializer):
         
         return result
 
+class CountingArtetaSerializer(AppletSerializer):
+    """Encapsulate the serialization scheme for pixel classification
+    workflow parameters and datasets.    For Arteta implementation
+    """
+    def __init__(self, operator, projectFileGroupName):
+        self.predictionSlot = SerialPredictionSlot(operator.PredictionProbabilities,
+                                                   operator,
+                                                   name='Predictions',
+                                                   subname='predictions{:04d}',)
+        slots = [SerialListSlot(operator.LabelNames,
+                                transform=str),
+                 SerialListSlot(operator.LabelColors, transform=lambda x: tuple(x.flat)),
+                 SerialListSlot(operator.PmapColors, transform=lambda x: tuple(x.flat)),
+                 SerialBlockSlot(operator.LabelImages,
+                                 operator.LabelInputs,
+                                 operator.NonzeroLabelBlocks,
+                                 name='LabelSets',
+                                 subname='labels{:0}',
+                                 selfdepends=False),
+                 self.predictionSlot,
+                 SerialSlot(operator.opTrain.Sigma, selfdepends=True),
+                 SerialSlot(operator.opTrain.MaxDepth, selfdepends=True),
+                 SerialBoxSlot(operator.opTrain.BoxConstraintValues,operator.opTrain,
+                              name="Values",
+                               subname="values{:04d}"),
+                 SerialBoxSlot(operator.boxViewer.rois, operator.boxViewer,
+                              name="ViewRois",
+                              subname="viewrois{:04d}") #,
+                 # SerialCountingSlot(operator.Classifier,
+                 #                      operator.classifier_cache,
+                 #                      name="CountingWrappers")
+                ]
+
+        super(CountingArtetaSerializer, self).__init__(projectFileGroupName,
+                                                            slots=slots)
+        # self.predictionSlot.progressSignal.connect(self.progressSignal.emit)
+
+    @property
+    def predictionStorageEnabled(self):
+        return self.predictionSlot.predictionStorageEnabled
+
+    @predictionStorageEnabled.setter
+    def predictionStorageEnabled(self, value):
+        self.predictionSlot.predictionStorageEnabled = value
+
+    def cancel(self):
+        self.predictionSlot.cancel()
+
+    def isDirty(self):
+        # Check all slots except the prediction slot
+        serialSlots = set(self.serialSlots)
+        serialSlots -= set([self.predictionSlot])
+        result = any(list(ss.dirty for ss in serialSlots))
+        
+        # Check the prediction slot, but only if prediction storage is enabled
+        result |= (self.predictionSlot.dirty and self.predictionSlot.predictionStorageEnabled)
+        
+        return result
+
 class Ilastik05ImportDeserializer(AppletSerializer):
     """
     Special (de)serializer for importing ilastik 0.5 projects.

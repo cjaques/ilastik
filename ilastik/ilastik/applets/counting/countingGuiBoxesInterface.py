@@ -560,7 +560,6 @@ class CoupledRectangleElement(object):
         #self.rectItem.color=qcolor
 
     def _initConnect(self):
-        # print "initializing ...", self.getStart(),self.getStop()
 
         #Operator changes
         self._opsub.Input.connect(self._inputSlot)
@@ -884,7 +883,7 @@ class BoxController(QObject):
     viewBoxesChanged = pyqtSignal(dict)
 
 
-    def __init__(self,editor,connectionInput,boxListModel):
+    def __init__(self,editor,connectionInput,boxListModel, delegateMethod=None):
         '''
         Class which controls all boxes on the scene
 
@@ -908,12 +907,10 @@ class BoxController(QObject):
         self.boxListModel=boxListModel
         self.scene.selectionChanged.connect(self.handleSelectionChange)
 
-
-
         boxListModel.boxRemoved.connect(self.deleteItem)
         boxListModel.signalSaveAllBoxesToCSV.connect(self.saveBoxesToCSV)
 
-
+        self.delegateMethod = delegateMethod
 
     def getCurrentActiveBox(self):
         pass
@@ -981,6 +978,10 @@ class BoxController(QObject):
 
         self.currentColor=self._getNextBoxColor()
 
+        # call delegate function to update Operator
+        if( self.delegateMethod is not None ):
+            self.delegateMethod()
+            
     def _fixedBoxesChanged(self, *args):
         boxes = {"rois" : [], "values" : []}
         for box, rect in zip(self.boxListModel._elements, self._currentBoxesList):
@@ -1032,6 +1033,9 @@ class BoxController(QObject):
         #super(type(self.boxListModel),self.boxListModel).removeRow(index)
         el.release()
 
+        # call delegate function to update Operator
+        if( self.delegateMethod is not None ):
+            self.delegateMethod()
 
     def selectBoxItem(self,index):
         [el._rectItem.setSelected(False) for el in self._currentBoxesList] #deselect the others
