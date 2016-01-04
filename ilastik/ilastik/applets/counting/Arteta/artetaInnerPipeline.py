@@ -54,7 +54,8 @@ class ArtetaPipeline(object):
         aux = leaves_x
         res = np.zeros(mask.shape + (num_leaves,), dtype=np.float32)
 
-        # count = np.sum(leaves_x[:])
+        count = np.sum(leaves_x[:])
+
         # print 'Num leaves : ', num_leaves
         # print 'Scaled_x : ', scaled_x.shape
         # print 'leaves_x : ', leaves_x.shape
@@ -65,12 +66,13 @@ class ArtetaPipeline(object):
 
         res[mask] = aux
         
-        return res
+        return res #[mask]
     
     def _extract_training_data(self, img, density, mask):
-
+        # coords will take only pixels within the mask and, if self.num_training_samples isn't None 
+        # (is set to None by default) it takes a sub-sample of the pixels.
         coords = sampling.random_coords_from_mask(self.num_training_samples, mask, self.random_state)
-        # print 'extract train data ', img.shape, density.shape, mask.shape
+        print 'extracting data : ', img.shape, density.shape, mask.shape
         xs, ys = [], []
         for size in [self.kernel_size]:
             if self.kernel_type == 'flat':
@@ -78,12 +80,12 @@ class ArtetaPipeline(object):
                 int_img = utils.separate_convolve(img, kernel, axis=[0, 1, 2])
                 int_density = utils.separate_convolve(density, kernel, axis=[0, 1, 2])
             elif self.kernel_type == 'gaussian':
-                int_img = ndimage.gaussian_filter(img, sigma=[size, size,  0]) #size, # removed on dimension here to work on 2d images first
-                int_density = ndimage.gaussian_filter(density, sigma=[size, size]) #, size
+                int_img = ndimage.gaussian_filter(img, sigma=[size, size,  0, 0]) #size, # removed on dimension here to work on 2d images first
+                int_density = ndimage.gaussian_filter(density, sigma=[size, size, 0]) #, size
             else:
                 raise ValueError, "Unknown kernel_type '%s'" % self.kernel_type
  
-            xs.append(int_img[coords])
+            xs.append(int_img[coords]) 
             ys.append(int_density[coords])
         
         return np.vstack(xs), np.hstack(ys)
@@ -106,17 +108,18 @@ class ArtetaPipeline(object):
         self.scaler = StandardScaler()
         scaled_xs = self.scaler.fit_transform(np.vstack(xs))
 
-        print 'Shape of features  before/after scaling',np.vstack(xs).shape, scaled_xs.shape
+        print 'Shape of features before/after scaling',np.vstack(xs).shape, scaled_xs.shape
         self.kdtree = KDTreeTransformer(self.maxDepth)
         self.kdtree.fit(scaled_xs)
         
         # Generate histograms
         histograms = self._compute_histograms(imgs,masks,xs) # map(self._compute_histograms, imgs, masks, xs) #
         
-        xs, ys = zip(self._extract_training_data(histograms, densities, masks)) # *map(self._extract_training_data, histograms, densities, masks)) #
+        xs, ys = zip(self._extract_training_data(histograms, densities, masks)) #  *map(self._extract_training_data, histograms, densities, masks)) # 
         xs = np.vstack(xs)
         ys = np.hstack(ys)
         
+        print 'After extracting training data, shapes xs and ys are : ', xs.shape, ys.shape
         # Fit regressor
         self.regressor.fit(xs, ys)
         

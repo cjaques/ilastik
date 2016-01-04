@@ -377,8 +377,8 @@ class OpArtetaPredictionPipeline(OpArtetaPredictionPipelineNoCache):
 
 	def setupOutputs(self):
 		# set cache block shape to input dimension
-		# self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape)
-		pass
+		self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape)
+		# pass
 
 class OpPredictArtetaCounter(Operator):
 	name = "PredictArtetaCounter"
