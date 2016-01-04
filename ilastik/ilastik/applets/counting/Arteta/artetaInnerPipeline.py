@@ -70,7 +70,7 @@ class ArtetaPipeline(object):
     def _extract_training_data(self, img, density, mask):
 
         coords = sampling.random_coords_from_mask(self.num_training_samples, mask, self.random_state)
-        
+        # print 'extract train data ', img.shape, density.shape, mask.shape
         xs, ys = [], []
         for size in [self.kernel_size]:
             if self.kernel_type == 'flat':
@@ -82,7 +82,7 @@ class ArtetaPipeline(object):
                 int_density = ndimage.gaussian_filter(density, sigma=[size, size]) #, size
             else:
                 raise ValueError, "Unknown kernel_type '%s'" % self.kernel_type
-            
+ 
             xs.append(int_img[coords])
             ys.append(int_density[coords])
         
@@ -97,29 +97,27 @@ class ArtetaPipeline(object):
     def fit(self, imgs, xs,  densities, masks):
         
         # print '[Arteta_pipeline] Fitting Classifier to data...'
+        # print imgs.shape, xs.shape, densities.shape, masks.shape
 
         # only take into account pixels in the boxes
         xs = xs[masks[:,:,0]]
 
         # Fit the scaler and the kd-tree
-        logger.info("Scaling channels...")
         self.scaler = StandardScaler()
         scaled_xs = self.scaler.fit_transform(np.vstack(xs))
 
-        logger.info("Building kd-tree...")
+        # print 'Shape of features before/after scaling',np.vstack(xs).shape, scaled_xs.shape
         self.kdtree = KDTreeTransformer(self.maxDepth)
         self.kdtree.fit(scaled_xs)
         
         # Generate histograms
-        logger.info("Computing histograms...")
         histograms = self._compute_histograms(imgs,masks,xs) # map(self._compute_histograms, imgs, masks, xs) #
         
-        logger.info("Integrating histograms and extracting samples...")
-        xs, ys = zip(*map(self._extract_training_data, histograms, densities, masks))
+        xs, ys = zip(*map(self._extract_training_data, histograms, densities, masks)) #self._extract_training_data(histograms, densities, masks)) #
         xs = np.vstack(xs)
         ys = np.hstack(ys)
         
-        logger.info("Fitting the regressor...")
+        # Fit regressor
         self.regressor.fit(xs, ys)
         
         indices = np.arange(xs.shape[1])

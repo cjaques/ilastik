@@ -33,7 +33,7 @@ import threading
 from ilastik.applets.base.applet import DatasetConstraintError
 
 # Arteta
-from ..Arteta.arteta_pipeline import ArtetaPipeline
+from ..Arteta.artetaInnerPipeline import ArtetaPipeline
 
 class OpCountingArteta( Operator ):
 	"""
@@ -49,14 +49,10 @@ class OpCountingArteta( Operator ):
 	LabelInputs = InputSlot(optional = True, level=1) # Input for providing label data from an external source
 	BoxLabelInputs = InputSlot(optional = True, level=1) # Input for providing label data from an external source
 	LabelsAllowedFlags = InputSlot(stype='bool', level=1) # Specifies which images are permitted to be labeled 
-
 	FeatureImages = InputSlot(level=1) # Computed feature images (each channel is a different feature)
 	CachedFeatureImages = InputSlot(level=1) # Cached feature data.
-
 	FreezePredictions = InputSlot(stype='bool', value=False)
-
 	PredictionsFromDisk = InputSlot(optional=True, level=1)
-
 	PredictionProbabilities = OutputSlot(level=1) # Classification predictions (via feature cache for interactive speed)
 
 	#PredictionProbabilityChannels = OutputSlot(level=2) # Classification predictions, enumerated by channel
@@ -66,9 +62,7 @@ class OpCountingArteta( Operator ):
 	BoxLabelImages= OutputSlot(level=1) # Input for providing label data from an external source
 	NonzeroLabelBlocks = OutputSlot(level=1) # A list if slices that contain non-zero label values
 	Classifier = OutputSlot() # We provide the classifier as an external output for other applets to use
-
 	CachedPredictionProbabilities = OutputSlot(level=1) # Classification predictions (via feature cache AND prediction cache)
-
 	HeadlessPredictionProbabilities = OutputSlot(level=1) # Classification predictions ( via no image caches (except for the classifier itself )
 
 	UncertaintyEstimate = OutputSlot(level=1)
@@ -129,11 +123,12 @@ class OpCountingArteta( Operator ):
 
 		self.opTrain = OpTrainArtetaCounter( parent=self, graph=self.graph )
 		self.opTrain.inputs['InputImages'].connect( self.InputImages)
-		self.opTrain.inputs['Labels'].connect( self.GetFore.Output)
-		self.opTrain.inputs['BoxConstraintValues'].connect( self.opLabelPipeline.BoxOutput )
+		self.opTrain.inputs['Labels'].connect( self.GetFore.Output) 
+		# FIXME : it should be done using the same 'slots' mechanism, this is done "manually", through GUI interface, thus the next line is commented.
+		# self.opTrain.inputs['BoxConstraintValues'].connect( self.opLabelPipeline.BoxOutput ) 
 		self.opTrain.inputs['Features'].connect( self.FeatureImages ) 
 		self.opTrain.inputs["nonzeroLabelBlocks"].connect( self.opLabelPipeline.nonzeroBlocks )
-		# self.opTrain.inputs['fixClassifier'].setValue( True )
+		self.opTrain.inputs['fixClassifier'].setValue( True )
 
 		# Hook up the Classifier Cache
 		# The classifier is cached here to allow serializers to force in
@@ -172,8 +167,8 @@ class OpCountingArteta( Operator ):
 
 		def handleNewInputImage( multislot, index, *args ):
 			def handleInputReady(slot):
-				# Chris - maybe a really bad idea
-				# self._checkConstraints(index)
+				# Chris - maybe a really bad idea - check constraints now?
+				self._checkConstraints(index)
 				self.setupCaches( multislot.index(slot) )
 			multislot[index].notifyReady(handleInputReady)
 				
@@ -254,28 +249,16 @@ class OpCountingArteta( Operator ):
 	
 	def _checkConstraints(self, laneIndex):
 		"""
-		Ensure that all input images must be 2D and have the same number of channels
+		Ensure that all input images have the same number of channels
 		"""
-		
-		
+
 		thisLaneTaggedShape = self.InputImages[laneIndex].meta.getTaggedShape()
 		
-		if thisLaneTaggedShape.has_key('z'):
+		if self.InputImages[laneIndex].meta.getAxisKeys()[-1] != 'c':
 			raise DatasetConstraintError(
-				"Objects Counting Workflow",
-				"All input images must be 2D (they cannot contain the z dimension).  "\
-				"Your new image has {} z dimension"\
-				.format( thisLaneTaggedShape['z']))
-				# Find a different lane and use it for comparison
-		
-		if thisLaneTaggedShape.has_key('t'):
-			raise DatasetConstraintError(
-				"Objects Counting Workflow",
-				"All input images must be 2D (they cannot contain the t dimension).  "\
-				"Your new image has {} t dimension"\
-				.format( thisLaneTaggedShape['t']))
-				# Find a different lane and use it for comparison
-		
+				 "Objects Couting Workflow Counting",
+				 "This code assumes channel is the last axis")
+
 		validShape = thisLaneTaggedShape
 		for i, slot in enumerate(self.InputImages):
 			if slot.ready() and i != laneIndex:
@@ -391,11 +374,11 @@ class OpArtetaPredictionPipeline(OpArtetaPredictionPipelineNoCache):
 		self.precomputed_predictions_gui.SlowInput.connect( self.meaner.Output )
 		self.precomputed_predictions_gui.PrecomputedInput.connect( self.PredictionsFromDisk )
 		self.CachedPredictionProbabilities.connect(self.precomputed_predictions_gui.Output)
-		# self.CachedPredictionProbabilities.connect(self.predict.PMaps ) # to debug outputs not ready
 
 	def setupOutputs(self):
 		# set cache block shape to input dimension
-		self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape)
+		# self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape)
+		pass
 
 class OpPredictArtetaCounter(Operator):
 	name = "PredictArtetaCounter"
@@ -414,16 +397,16 @@ class OpPredictArtetaCounter(Operator):
 		# we have to set output as dirty 
 		self.outputs["PMaps"].setDirty()
 
-
 	def setupOutputs(self):
 		self.PMaps.meta.dtype = numpy.float32
 		self.PMaps.meta.axistags = copy.copy(self.Image.meta.axistags)
-		self.PMaps.meta.shape = self.Image.meta.shape # FIXME - make sure output works with color images (3D)
-		self.PMaps.meta.drange = (0.0, 1.0)
+		# Channel is the last axis (checked before), set it to 1 for output
+		self.PMaps.meta.shape = (self.Image.meta.shape[:-1] + (1,))
+		self.PMaps.meta.drange = (0, 1.0)
 
 	def execute(self, slot, subindex, roi, result):
 		print '[OpPredictArtetaCounter] - computing count predictions '
-		# t1 = time.time()
+		
 		classifier =self.inputs["Classifier"][:].wait()
 		feats = self.inputs["Features"][:].wait()
 		mask = numpy.ones((feats.shape[:-1] + (1,) ),dtype=bool)
@@ -433,17 +416,12 @@ class OpPredictArtetaCounter(Operator):
 			print '[OpPredictArtetaCounter] - No classifier supplied, returning zeros'
 			return numpy.zeros(numpy.subtract(roi.stop, roi.start), dtype=numpy.float32)[...]
 
-		# t2 = time.time()
-
 		# actual prediction 
 		res = classifier[0].predict_one(feats,mask)
-		
-		# t3 = time.time()
-
 		result = res[...,None]
-		roiS = roiToSlice(roi.start,roi.stop)
+		roiAsSlice = roiToSlice(roi.start,roi.stop)
 		
-		return result[roiS]
+		return result[roiAsSlice]
 
 	def propagateDirty(self, slot, subindex, roi):
 		self.outputs["PMaps"].setDirty()
@@ -483,9 +461,10 @@ class OpTrainArtetaCounter(Operator):
 		self.inputs["Features"].meta.dtype = numpy.ndarray
 
 	def setupOutputs(self):
-		if(self.inputs["fixClassifier"]).value == False:
-			params = {"sigma": self.Sigma.value,"maxDepth" : self.MaxDepth.value}
-			self.arteta_pipeline.set_params(**params)
+		# if(self.inputs["fixClassifier"]).value == False:
+		# 	params = {"sigma": self.Sigma.value,"maxDepth" : self.MaxDepth.value}
+		# 	self.arteta_pipeline.set_params(**params)
+		pass
 		
 	def propagateDirty(self, slot, subindex, roi):
 		if slot is not self.inputs["fixClassifier"] and self.inputs["fixClassifier"].value == False:
@@ -499,11 +478,15 @@ class OpTrainArtetaCounter(Operator):
 		labels = self.Labels[0][:].wait()
 		imgs = self.InputImages[0][:].wait()
 		boxes = self.BoxesCoords[:].wait()
+
+		# set params from UI
+		params = {"sigma": self.Sigma.value,"maxDepth" : self.MaxDepth.value}
+		self.arteta_pipeline.set_params(**params)
 		
 		# compute mask based on boxes
-		shape = labels.shape 
-		mask = numpy.zeros((shape),dtype=bool)
+		mask = numpy.zeros((labels.shape ),dtype=bool)
 		mask = self.computeMask(mask,boxes[0])
+
 		# train classifier
 		self.arteta_pipeline.fit(imgs, feats,labels,mask)
 		result = self.arteta_pipeline

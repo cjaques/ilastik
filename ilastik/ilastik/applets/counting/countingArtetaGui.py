@@ -455,9 +455,10 @@ class CountingArtetaGui(LabelingGui):
 
             if opTrain.BoxConstraintValues[id].value != vals or opTrain.BoxConstraintRois[id].value != rois:
                 opTrain.fixClassifier.setValue(True)
-                # quickfix for already connected slot to [] 
-                if(opTrain.BoxConstraintRois[id].connected() == True and opTrain.BoxConstraintValues[id].value == [] ):
-                    opTrain.BoxConstraintRois[id].disconnect()
+                # quickfix for already connected slot to [] - doesn't seem to be necessary anymore.
+                # FIXME : remove these lines onces applet is fully tested
+                # if(opTrain.BoxConstraintRois[id].connected() == True and opTrain.BoxConstraintValues[id].value == [] ):
+                #     opTrain.BoxConstraintRois[id].disconnect()
                 opTrain.BoxConstraintRois[id].setValue(rois)
         
                 #at this position so the change of a value can trigger a recomputation
@@ -1077,9 +1078,8 @@ class CountingArtetaGui(LabelingGui):
         self.labelingDrawerUi.liveUpdateButton.setChecked(state)
 
     def trainClassifier(self,*args,**kw):
-        # getting boxes coordinates
-        coords = self.boxController.getBoxesCoordinates() # FIXME : this should be done using input slots to opTrain. 
-        self.op.opTrain.setCoords(coords)
+        # this is called when clicking on "train" in the GUI.
+        # for debug purposes only
         classif = self.op.Classifier[...].wait()
 
 
