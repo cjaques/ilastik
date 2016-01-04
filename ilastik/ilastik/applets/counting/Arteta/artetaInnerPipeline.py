@@ -96,8 +96,8 @@ class ArtetaPipeline(object):
     
     def fit(self, imgs, xs,  densities, masks):
         
-        # print '[Arteta_pipeline] Fitting Classifier to data...'
-        # print imgs.shape, xs.shape, densities.shape, masks.shape
+        print '[Arteta_pipeline] Fitting Classifier to data...'
+        print imgs.shape, xs.shape, densities.shape, masks.shape
 
         # only take into account pixels in the boxes
         xs = xs[masks[:,:,0]]
@@ -106,7 +106,7 @@ class ArtetaPipeline(object):
         self.scaler = StandardScaler()
         scaled_xs = self.scaler.fit_transform(np.vstack(xs))
 
-        # print 'Shape of features before/after scaling',np.vstack(xs).shape, scaled_xs.shape
+        print 'Shape of features before/after scaling',np.vstack(xs).shape, scaled_xs.shape
         self.kdtree = KDTreeTransformer(self.maxDepth)
         self.kdtree.fit(scaled_xs)
         
