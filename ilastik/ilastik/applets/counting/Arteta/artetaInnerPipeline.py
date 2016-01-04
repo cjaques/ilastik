@@ -106,14 +106,14 @@ class ArtetaPipeline(object):
         self.scaler = StandardScaler()
         scaled_xs = self.scaler.fit_transform(np.vstack(xs))
 
-        print 'Shape of features before/after scaling',np.vstack(xs).shape, scaled_xs.shape
+        print 'Shape of features  before/after scaling',np.vstack(xs).shape, scaled_xs.shape
         self.kdtree = KDTreeTransformer(self.maxDepth)
         self.kdtree.fit(scaled_xs)
         
         # Generate histograms
         histograms = self._compute_histograms(imgs,masks,xs) # map(self._compute_histograms, imgs, masks, xs) #
         
-        xs, ys = zip(*map(self._extract_training_data, histograms, densities, masks)) #self._extract_training_data(histograms, densities, masks)) #
+        xs, ys = zip(self._extract_training_data(histograms, densities, masks)) # *map(self._extract_training_data, histograms, densities, masks)) #
         xs = np.vstack(xs)
         ys = np.hstack(ys)
         
