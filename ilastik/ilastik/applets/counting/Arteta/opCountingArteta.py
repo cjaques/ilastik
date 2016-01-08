@@ -19,7 +19,7 @@ from lazyflow.operators import OpValueCache, \
 from lazyflow.operators.opDenseLabelArray import OpDenseLabelArray
 
 from lazyflow.request import Request, RequestPool
-from lazyflow.roi     import roiToSlice, sliceToRoi
+from lazyflow.roi     import roiToSlice, sliceToRoi, nonzero_bounding_box
 							   
 from ilastik.applets.counting.countingOperators import OpTrainCounter, OpPredictCounter, OpLabelPreviewer
 from ilastik.applets.counting.opCounting import OpLabelPipeline, OpPredictionPipelineNoCache, \
@@ -124,7 +124,7 @@ class OpCountingArteta( Operator ):
 		self.opTrain = OpTrainArtetaCounter( parent=self, graph=self.graph )
 		self.opTrain.inputs['InputImages'].connect( self.InputImages)
 		self.opTrain.inputs['Labels'].connect( self.GetFore.Output) 
-		# FIXME : it should be done using the same 'slots' mechanism, this is done "manually", through GUI interface, thus the next line is commented.
+		# FIXME : it should be done using the same 'slot' mechanism, this is done "manually", through GUI interface, thus the next line is commented.
 		# self.opTrain.inputs['BoxConstraintValues'].connect( self.opLabelPipeline.BoxOutput ) 
 		self.opTrain.inputs['Features'].connect( self.FeatureImages ) 
 		self.opTrain.inputs["nonzeroLabelBlocks"].connect( self.opLabelPipeline.nonzeroBlocks )
@@ -400,7 +400,7 @@ class OpPredictArtetaCounter(Operator):
 	def setupOutputs(self):
 		self.PMaps.meta.dtype = numpy.float32
 		self.PMaps.meta.axistags = copy.copy(self.Image.meta.axistags)
-		# Channel is the last axis (checked before), set it to 1 for output
+		# Channel is the last axis, set it to 1 for output
 		self.PMaps.meta.shape = (self.Image.meta.shape[:-1] + (1,))
 		self.PMaps.meta.drange = (0, 1.0)
 
@@ -409,19 +409,32 @@ class OpPredictArtetaCounter(Operator):
 		
 		classifier =self.inputs["Classifier"][:].wait()
 		feats = self.inputs["Features"][:].wait()
-		mask = numpy.ones((feats.shape[:-1] + (1,) ),dtype=bool)
+		mask = numpy.ones((feats.shape[:-1]  ),dtype=bool) # + (1,) # removed, useless
 
 		if classifier is None:
 			# Training operator may return 'None' if there was no data to train with
 			print '[OpPredictArtetaCounter] - No classifier supplied, returning zeros'
 			return numpy.zeros(numpy.subtract(roi.stop, roi.start), dtype=numpy.float32)[...]
 
+		# hack to add a useless axis to mask and feats, so that they work with predict (using map)
+		isSingleImage = False
+		if len(mask.shape) == 2 : 
+			mask = mask[None,...]
+			feats = feats[None, ...]
+			isSingleImage = True
+
 		# actual prediction 
-		res = classifier[0].predict_one(feats,mask)
-		result = res[...,None]
+		res = classifier[0].predict(feats,mask) 
+		result = numpy.asarray(res)[...,None] # add channel axis 
+
+		# return value 
+		res = result
 		roiAsSlice = roiToSlice(roi.start,roi.stop)
 		
-		return result[roiAsSlice]
+		if isSingleImage : 
+			res = res[0,...] # remove t dimension, as it wasn't in the input meta
+
+		return res[roiAsSlice]
 
 	def propagateDirty(self, slot, subindex, roi):
 		self.outputs["PMaps"].setDirty()
@@ -471,26 +484,53 @@ class OpTrainArtetaCounter(Operator):
 			self.outputs["Classifier"].setDirty()
 
 	def execute(self, slot, subindex, roi, result):
-		print '[OpTrainArtetaCounter] - training classifier'
 
+		print '[OpTrainArtetaCounter] - training classifier'
 		# read inputs
-		feats = self.Features[0][:].wait() # FIXME : why doesn't it work with Features.get(roi) ?
+		feats = self.Features[0][:].wait() 
 		labels = self.Labels[0][:].wait()
 		imgs = self.InputImages[0][:].wait()
-		boxes = self.BoxesCoords[:].wait()
+		boxes = self.BoxesCoords[:].wait() # FIXME : clean this 
 
 		# set params from UI
 		params = {"sigma": self.Sigma.value,"maxDepth" : self.MaxDepth.value}
 		self.arteta_pipeline.set_params(**params)
+
+		# do we have a single image or a serie along time ?
+		if self.Labels[0].meta.axistags.index('t') < len(self.Labels[0].meta.axistags) : 
+			# getting annotations coordinates
+			labels = self.Labels[0][:].wait()
+			labels_coordinates = numpy.nonzero(labels)
+
+			# getting images (along t dimension) that have annotations
+			assert self.Labels[0].meta.axistags.index('t') == 0, "t axis should be at position 0, not {}".format(self.Labels[0].meta.axistags.index('t'))
+			annotated_frames = numpy.unique(labels_coordinates[0]) 
+			print 'T values where there are annotations : ', annotated_frames
+
+			# extracting images with annotations
+			annotated_imgs = imgs[annotated_frames]
+			annotated_feats = feats[annotated_frames]
+			annotated_layers = labels[annotated_frames]
+			
+			# FIXME : locate t position of masks
+			# compute mask based on boxes
+			mask = numpy.zeros((annotated_imgs.shape ),dtype=bool)
+			mask = self.computeMask(mask,boxes[0])
+
+			# train estimator
+			self.arteta_pipeline.fit(annotated_imgs, annotated_feats,annotated_layers,mask[...,0],True)
+
+		else:
+			# compute mask based on boxes
+			mask = numpy.zeros((labels.shape ),dtype=bool)
+			# add t axis at the beginning of the mask, to have the same shape length as multiple arrays.
+			mask = mask[None,...] 
+			mask = self.computeMask(mask,boxes[0])
+
+			# train estimator
+			self.arteta_pipeline.fit(imgs[...,0], feats,labels[...,0],mask[0,...,0])
 		
-		# compute mask based on boxes
-		mask = numpy.zeros((labels.shape ),dtype=bool)
-		mask = self.computeMask(mask,boxes[0])
-
-		# train classifier
-		self.arteta_pipeline.fit(imgs, feats,labels,mask)
 		result = self.arteta_pipeline
-
 		return [result]
 
 
@@ -500,15 +540,14 @@ class OpTrainArtetaCounter(Operator):
 			self.coords = coords
 			self.outputs['Classifier'].setDirty() # boxes modified, output is dirty
 
-	def computeMask(self,mask, boxes):
+	def computeMask(self,mask, boxes): # TODO : locate t position of masks
 		# if two boxes overlap, nothing special happens, the area will be taken into account.
 		for box in boxes:
 			x = box['x']
 			y = box['y']
 			w = box['w']
 			h = box['h']
-			mask[x:x+w,y:y+h] = 1
-		
+			mask[:, x:x+w,y:y+h] = 1 
 		return mask
 
 

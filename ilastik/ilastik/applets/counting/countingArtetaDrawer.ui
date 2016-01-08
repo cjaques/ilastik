@@ -227,6 +227,7 @@
      </property>
     </spacer>
    </item>
+   <!---  TODO : Chris - put back algorithm choice
    <item>
     <layout class="QGridLayout" name="gridLayout_7" columnminimumwidth="100,0,0">
      <item row="0" column="2">
@@ -241,6 +242,7 @@
      </item>
     </layout>
    </item>
+   -->
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_5">
      <item>

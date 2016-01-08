@@ -140,9 +140,6 @@ class CountingArtetaGui(LabelingGui):
         labelSlots.labelsAllowed = topLevelOperatorView.LabelsAllowedFlags
         labelSlots.labelNames = topLevelOperatorView.LabelNames
 
-
-
-
         # We provide our own UI file (which adds an extra control for interactive mode)
         labelingDrawerUiPath = os.path.split(__file__)[0] + '/countingArtetaDrawer.ui'
 
@@ -182,7 +179,6 @@ class CountingArtetaGui(LabelingGui):
             self.labelingDrawerUi.DebugButton.setVisible(False)
 
         self._initShortcuts()
-
 
 
 
@@ -326,8 +322,7 @@ class CountingArtetaGui(LabelingGui):
                 except Exception,e:
                     continue
             #values=[v for k,v in option.items() if k not in ["gui", "req"]]
-            self.labelingDrawerUi.AlgorithmList.addItem(option["method"], (option,))
-
+            # self.labelingDrawerUi.AlgorithmList.addItem(option["method"], (option,))
 
         cache = self.op.classifier_cache
         if hasattr(cache._value, "__iter__") and len(self.op.classifier_cache._value) > 0:
@@ -336,14 +331,10 @@ class CountingArtetaGui(LabelingGui):
             params = cache._value[0].get_params()
             Sigma = params["Sigma"]
             MaxDepth = params["maxdepth"]
-            _ind = self.labelingDrawerUi.AlgorithmList.findText(params["method"])
+            _ind = -1 #self.labelingDrawerUi.AlgorithmList.findText(params["method"])
 
             #set opTrain from parameters
             self.op.opTrain.initInputs(params)
-            #input boxes coordinates
-
-            # self._updateCoords()
-
 
         else: 
             #read parameters from opTrain Operator
@@ -357,11 +348,12 @@ class CountingArtetaGui(LabelingGui):
         self.labelingDrawerUi.SigmaBox.setValue(Sigma)
         self.labelingDrawerUi.MaxDepthBox.setValue(MaxDepth)
         if _ind == -1:
-            self.labelingDrawerUi.AlgorithmList.setCurrentIndex(0)
+            # self.labelingDrawerUi.AlgorithmList.setCurrentIndex(0)
             # self._updateSVROptions()
             # self._updateCoords()
-        else:
-            self.labelingDrawerUi.AlgorithmList.setCurrentIndex(_ind)
+        # else:
+        #     self.labelingDrawerUi.AlgorithmList.setCurrentIndex(_ind)
+            pass
 
         self._hideParameters()
 
@@ -369,7 +361,7 @@ class CountingArtetaGui(LabelingGui):
         self.op.opTrain.MaxDepth.setValue(self.labelingDrawerUi.MaxDepthBox.value())
 
     def _hideParameters(self):
-        _ind = self.labelingDrawerUi.AlgorithmList.currentIndex()
+        _ind = -1 #self.labelingDrawerUi.AlgorithmList.currentIndex()
         option = dict() #self.labelingDrawerUi.SVROptions.itemData(_ind).toPyObject()[0]
         # if "svr" not in option["gui"]:
         #     self.labelingDrawerUi.gridLayout_2.setVisible(False)
@@ -1073,7 +1065,7 @@ class CountingArtetaGui(LabelingGui):
         state = self.labelingDrawerUi.liveUpdateButton.isChecked()
         self.labelingDrawerUi.liveUpdateButton.setChecked(True)
         density = self.op.Density[...].wait()
-        strdensity = "{0:.2f}".format(numpy.sum(density))
+        strdensity = "{0:.2f}".format(numpy.sum(density)) # FIXME : density of displayed layer.
         self._labelControlUi.CountText.setText(strdensity)
         self.labelingDrawerUi.liveUpdateButton.setChecked(state)
 

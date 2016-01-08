@@ -20,7 +20,7 @@ class ArtetaPipeline(object):
                  num_training_samples=None,
                  kernel_size=15,
                  kernel_type='gaussian',
-                 avoid_negative_density=False,
+                 avoid_negative_density=True,
                  random_seed=None,
                  maxDepth = 8):
         
@@ -36,43 +36,23 @@ class ArtetaPipeline(object):
                             scoring=None, store_cv_values=True)
         self.maxDepth = maxDepth
     
-    # useless function, channels computed by features extractor
-    def _compute_channels(self, img, density, mask):
-        
-        phi = self.fextractor.transform_one(img)
-        
-        xs = phi[mask]
-        ys = density[mask]
-        
-        return xs, ys
-    
-    def _compute_histograms(self, img, mask, x=None):
+    def _compute_histograms(self, x, mask):
 
         scaled_x = self.scaler.transform(x)
+        
         leaves_x = self.kdtree.transform(scaled_x)
         num_leaves = self.kdtree.get_output_ndims()
         aux = leaves_x
         res = np.zeros(mask.shape + (num_leaves,), dtype=np.float32)
 
-        count = np.sum(leaves_x[:])
-
-        # print 'Num leaves : ', num_leaves
-        # print 'Scaled_x : ', scaled_x.shape
-        # print 'leaves_x : ', leaves_x.shape
-        # print 'Sum over scaled x ', count
-        # print 'shape res : ', res.shape
-        # print 'mask shape : ', mask.shape
-        # print 'res[mask] : ', res[mask].shape
-
         res[mask] = aux
-        
-        return res #[mask]
+        return res
     
     def _extract_training_data(self, img, density, mask):
         # coords will take only pixels within the mask and, if self.num_training_samples isn't None 
         # (is set to None by default) it takes a sub-sample of the pixels.
         coords = sampling.random_coords_from_mask(self.num_training_samples, mask, self.random_state)
-        print 'extracting data : ', img.shape, density.shape, mask.shape
+
         xs, ys = [], []
         for size in [self.kernel_size]:
             if self.kernel_type == 'flat':
@@ -80,46 +60,54 @@ class ArtetaPipeline(object):
                 int_img = utils.separate_convolve(img, kernel, axis=[0, 1, 2])
                 int_density = utils.separate_convolve(density, kernel, axis=[0, 1, 2])
             elif self.kernel_type == 'gaussian':
-                int_img = ndimage.gaussian_filter(img, sigma=[size, size,  0, 0]) #size, # removed on dimension here to work on 2d images first
-                int_density = ndimage.gaussian_filter(density, sigma=[size, size, 0]) #, size
+                int_img = ndimage.gaussian_filter(img, sigma=[size, size,  0]) 
+
+                if len(density.shape) == 3: # case with t dimension > 0 
+                    # we don't want to smooth along t axis --> sigma along t is 0
+                    int_density = ndimage.gaussian_filter(density, sigma=[size, size, 0]) 
+                    # temporary hack --> when loading multiples images, default axes are 'tzyxc'
+                    #   while mask has axes 'xy', thus transpose mask
+                    coords = np.nonzero(np.transpose(mask))
+                elif len(density.shape) == 2 : # case with t dimension = 0
+                    int_density = ndimage.gaussian_filter(density, sigma=[size, size]) 
+                else:
+                    raise ValueError, "Unexpected shape for input density : ", density.shape
             else:
                 raise ValueError, "Unknown kernel_type '%s'" % self.kernel_type
- 
+            
+            # import matplotlib.pyplot as plt
+            # f, axarr = plt.subplots(3)
+            # axarr[0].imshow(density)
+            # axarr[1].imshow(int_density)
+            # axarr[2].imshow(np.transpose(mask))
+            # plt.show()
+
             xs.append(int_img[coords]) 
             ys.append(int_density[coords])
-        
         return np.vstack(xs), np.hstack(ys)
-
-    def set_params(self, **args):
-        # FIXME : mechanism to deal with missing or unexisting inputs
-        self.maxDepth = args['maxDepth']
-        self.kernel_size = args['sigma']
-
     
-    def fit(self, imgs, xs,  densities, masks):
+    def fit(self, imgs, xs,  densities, masks, multipleAnnotatedLayers=False):
         
-        print '[Arteta_pipeline] Fitting Classifier to data...'
-        print imgs.shape, xs.shape, densities.shape, masks.shape
-
         # only take into account pixels in the boxes
-        xs = xs[masks[:,:,0]]
+        xs = xs[masks]
 
         # Fit the scaler and the kd-tree
         self.scaler = StandardScaler()
         scaled_xs = self.scaler.fit_transform(np.vstack(xs))
-
-        print 'Shape of features before/after scaling',np.vstack(xs).shape, scaled_xs.shape
         self.kdtree = KDTreeTransformer(self.maxDepth)
         self.kdtree.fit(scaled_xs)
         
         # Generate histograms
-        histograms = self._compute_histograms(imgs,masks,xs) # map(self._compute_histograms, imgs, masks, xs) #
-        
-        xs, ys = zip(self._extract_training_data(histograms, densities, masks)) #  *map(self._extract_training_data, histograms, densities, masks)) # 
+        if multipleAnnotatedLayers:
+            histograms = self._compute_histograms(xs,masks) #map(self._compute_histograms, xs, masks) #
+            xs, ys = zip(*map(self._extract_training_data, histograms, densities, masks)) # densities
+        else:
+            histograms = self._compute_histograms(xs,masks)
+            xs, ys = zip(self._extract_training_data(histograms, densities, masks)) 
+
         xs = np.vstack(xs)
-        ys = np.hstack(ys)
+        ys = np.hstack(np.hstack(ys))
         
-        print 'After extracting training data, shapes xs and ys are : ', xs.shape, ys.shape
         # Fit regressor
         self.regressor.fit(xs, ys)
         
@@ -138,22 +126,39 @@ class ArtetaPipeline(object):
     
     def predict_one(self, img, mask):
 
-        logger.info("Computing histograms...")
-        histograms = self._compute_histograms(None, mask,np.vstack(img))
-        logger.info("Predicting densities...")
+        histograms = self._compute_histograms(np.vstack(img), mask)
         pred = np.dot(histograms[mask], self.coef_) + self.intercept_
-        
         res = np.zeros(img.shape[:-1], dtype=np.float32)
-        res[mask[:,:,0]] = pred
-        # print 'Results shape : ', res.shape
-        # print '[Arteta_pipeline] - Predict one - Sum of predictions is : ', np.sum(res[...])
+        res[mask] = pred
+
+        print 'Predict one --------------  Count on this layer : ', np.sum(res)
+
         return res
     
     def predict(self, imgs, masks):
-        # print 'predicting for : ', imgs.shape, masks.shape
+        res = map(self.predict_one, imgs, masks)
         
-        return map(self.predict_one, imgs, masks)
-    
+        # import matplotlib.pyplot as plt
+        # f, axarr = plt.subplots(3, 3)
+        # axarr[0, 0].imshow(res[0])
+        # axarr[0, 1].imshow(res[1])
+        # axarr[0, 2].imshow(res[2])
+        # axarr[1, 0].imshow(res[3])
+        # # axarr[1, 1].imshow(res[4])
+        # # # axarr[1, 2].imshow(res[5])
+        # # # axarr[2, 0].imshow(res[6])
+        # # # axarr[2, 1].imshow(res[7])
+        # # # axarr[2, 2].imshow(res[8])
+        # plt.show()
+
+        return np.asarray(res)
+
+
+    def set_params(self, **args):
+        # FIXME : mechanism to deal with missing or unexisting inputs
+        self.maxDepth = args['maxDepth']
+        self.kernel_size = args['sigma']
+
     def get_params(self):
         return {#"feature_extractor": self.fextractor,
                 "regressor": self.regressor,

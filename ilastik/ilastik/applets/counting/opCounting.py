@@ -472,7 +472,6 @@ class OpLabelPipeline( Operator ):
         self.nonzeroBlocks.connect( self.opLabelArray.NonzeroBlocks )
         self.MaxLabel.connect( self.opLabelArray.MaxLabelValue )
         self.BoxOutput.connect( self.opBoxArray.Output )
-    
 
 
     def setupOutputs(self):
