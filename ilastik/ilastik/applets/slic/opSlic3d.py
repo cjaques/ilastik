@@ -11,7 +11,6 @@ import skimage.segmentation
 
 import sys, traceback, time
 import numpy, vigra
-sys.path.append('/Users/Chris/Code/cvlabRepo/slic/') #TODO CHRis - automate this (integrate slic code in Ilastik?)
 import slic 
 
 class OpSlic3D(Operator):
