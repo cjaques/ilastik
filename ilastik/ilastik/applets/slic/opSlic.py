@@ -10,7 +10,6 @@ from ilastik.utility import MultiLaneOperatorABC, OperatorSubView
 import traceback
 import numpy, vigra
 import sys
-sys.path.append('/Users/Chris/Code/python_tests/slic/') #TODO CHRis - automate this (integrate slic code in Ilastik?)
 import slic 
 
 class OpSlic(Operator):

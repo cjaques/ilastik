@@ -20,7 +20,6 @@
 ###############################################################################
 import os
 from ilastik.applets.base.standardApplet import StandardApplet
-# from opSlic import OpCachedSlic
 from opSlic3d import OpCachedSlic3D
 from slicSerializer import SlicSerializer
 
