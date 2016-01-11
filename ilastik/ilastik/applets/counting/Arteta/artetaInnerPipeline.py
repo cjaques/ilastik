@@ -65,29 +65,20 @@ class ArtetaPipeline(object):
                 if len(density.shape) == 3: # case with t dimension > 0 
                     # we don't want to smooth along t axis --> sigma along t is 0
                     int_density = ndimage.gaussian_filter(density, sigma=[size, size, 0]) 
-                    # temporary hack --> when loading multiples images, default axes are 'tzyxc'
-                    #   while mask has axes 'xy', thus transpose mask
-                    coords = np.nonzero(np.transpose(mask))
+
                 elif len(density.shape) == 2 : # case with t dimension = 0
                     int_density = ndimage.gaussian_filter(density, sigma=[size, size]) 
                 else:
-                    raise ValueError, "Unexpected shape for input density : ", density.shape
+                    raise ValueError, "Unexpected shape for input labels : ", density.shape
             else:
                 raise ValueError, "Unknown kernel_type '%s'" % self.kernel_type
-            
-            # import matplotlib.pyplot as plt
-            # f, axarr = plt.subplots(3)
-            # axarr[0].imshow(density)
-            # axarr[1].imshow(int_density)
-            # axarr[2].imshow(np.transpose(mask))
-            # plt.show()
 
             xs.append(int_img[coords]) 
             ys.append(int_density[coords])
         return np.vstack(xs), np.hstack(ys)
     
     def fit(self, imgs, xs,  densities, masks, multipleAnnotatedLayers=False):
-        
+
         # only take into account pixels in the boxes
         xs = xs[masks]
 
@@ -99,8 +90,8 @@ class ArtetaPipeline(object):
         
         # Generate histograms
         if multipleAnnotatedLayers:
-            histograms = self._compute_histograms(xs,masks) #map(self._compute_histograms, xs, masks) #
-            xs, ys = zip(*map(self._extract_training_data, histograms, densities, masks)) # densities
+            histograms = self._compute_histograms(xs,masks) 
+            xs, ys = zip(*map(self._extract_training_data, histograms, densities, masks))
         else:
             histograms = self._compute_histograms(xs,masks)
             xs, ys = zip(self._extract_training_data(histograms, densities, masks)) 
@@ -136,23 +127,8 @@ class ArtetaPipeline(object):
         return res
     
     def predict(self, imgs, masks):
-        res = map(self.predict_one, imgs, masks)
-        
-        # import matplotlib.pyplot as plt
-        # f, axarr = plt.subplots(3, 3)
-        # axarr[0, 0].imshow(res[0])
-        # axarr[0, 1].imshow(res[1])
-        # axarr[0, 2].imshow(res[2])
-        # axarr[1, 0].imshow(res[3])
-        # # axarr[1, 1].imshow(res[4])
-        # # # axarr[1, 2].imshow(res[5])
-        # # # axarr[2, 0].imshow(res[6])
-        # # # axarr[2, 1].imshow(res[7])
-        # # # axarr[2, 2].imshow(res[8])
-        # plt.show()
-
-        return np.asarray(res)
-
+        res = np.asarray(map(self.predict_one, imgs, masks))
+        return res
 
     def set_params(self, **args):
         # FIXME : mechanism to deal with missing or unexisting inputs
@@ -167,4 +143,5 @@ class ArtetaPipeline(object):
                 "kernel_type": self.kernel_type,
                 "random_seed": self.random_seed,
                 "avoid_negative_density": self.avoid_negative_density}
+
     

@@ -80,7 +80,7 @@ def main():
     #parsed_args.new_project = '/tmp/emptyproj.ilp'
     #parsed_args.workflow = "Pixel Classification"
     ilastik_main.main(parsed_args, workflow_cmdline_args)
-    print parsed_args
+    # print parsed_args
 
 if __name__ == "__main__":
     # Examples:

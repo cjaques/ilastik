@@ -405,7 +405,7 @@ class OpPredictArtetaCounter(Operator):
 		self.PMaps.meta.drange = (0, 1.0)
 
 	def execute(self, slot, subindex, roi, result):
-		print '[OpPredictArtetaCounter] - computing count predictions '
+		print '[OpPredictArtetaCounter] - computing count predictions for roi ', roi
 		
 		classifier =self.inputs["Classifier"][:].wait()
 		feats = self.inputs["Features"][:].wait()
@@ -430,7 +430,8 @@ class OpPredictArtetaCounter(Operator):
 		# return value 
 		res = result
 		roiAsSlice = roiToSlice(roi.start,roi.stop)
-		
+		print 'RoiAsSlice : ', roiAsSlice
+		print 'Result global shape ', res.shape
 		if isSingleImage : 
 			res = res[0,...] # remove t dimension, as it wasn't in the input meta
 
@@ -490,7 +491,11 @@ class OpTrainArtetaCounter(Operator):
 		feats = self.Features[0][:].wait() 
 		labels = self.Labels[0][:].wait()
 		imgs = self.InputImages[0][:].wait()
-		boxes = self.BoxesCoords[:].wait() # FIXME : clean this 
+		boxes = self.BoxesCoords[:].wait()
+
+		print self.Labels[0].meta.axistags
+		print self.InputImages[0].meta.axistags
+		print self.Features[0].meta.axistags
 
 		# set params from UI
 		params = {"sigma": self.Sigma.value,"maxDepth" : self.MaxDepth.value}
@@ -515,7 +520,7 @@ class OpTrainArtetaCounter(Operator):
 			# FIXME : locate t position of masks
 			# compute mask based on boxes
 			mask = numpy.zeros((annotated_imgs.shape ),dtype=bool)
-			mask = self.computeMask(mask,boxes[0])
+			mask = self.computeMask(mask,boxes[0], invertXY=True)
 
 			# train estimator
 			self.arteta_pipeline.fit(annotated_imgs, annotated_feats,annotated_layers,mask[...,0],True)
@@ -534,20 +539,27 @@ class OpTrainArtetaCounter(Operator):
 		return [result]
 
 
-	def setCoords(self,coords):
-		print 'Coords are : ', coords
-		if(self.coords != coords):
-			self.coords = coords
-			self.outputs['Classifier'].setDirty() # boxes modified, output is dirty
+	# def setCoords(self,coords):
+	# 	print 'Coords are : ', coords
+	# 	if(self.coords != coords):
+	# 		self.coords = coords
+	# 		self.outputs['Classifier'].setDirty() # boxes modified, output is dirty
 
-	def computeMask(self,mask, boxes): # TODO : locate t position of masks
-		# if two boxes overlap, nothing special happens, the area will be taken into account.
+	def computeMask(self,mask, boxes,invertXY=False): 
+	# TODO : locate t position of masks
+	# if two boxes overlap, nothing special happens, 
+	#	the overlapped area will be taken into account once.
+	
 		for box in boxes:
 			x = box['x']
 			y = box['y']
 			w = box['w']
 			h = box['h']
-			mask[:, x:x+w,y:y+h] = 1 
+			# print 'Box dimensions : ', h, w
+			if(invertXY):
+				mask[:,y:y+h, x:x+w] = 1 
+			else:
+				mask[:, x:x+w,y:y+h] = 1 
 		return mask
 
 

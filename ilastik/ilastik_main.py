@@ -222,7 +222,7 @@ def _prepare_lazyflow_config( parsed_args ):
     n_threads = os.getenv("LAZYFLOW_THREADS", None)
     total_ram_mb = os.getenv("LAZYFLOW_TOTAL_RAM_MB", None)
 
-    print 'Number of threads : ', n_threads
+    # print 'Number of threads : ', n_threads
 
     # Convert str -> int
     if n_threads is not None:
