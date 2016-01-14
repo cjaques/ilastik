@@ -25,6 +25,7 @@ class OpSlic3D(Operator):
     Boundaries = OutputSlot()
     tempArray = numpy.array((10,10,10)) #tuple()) 
 
+
     def setupOutputs(self):
         self.Output.meta.assignFrom(self.Input.meta)
         self.Boundaries.meta.assignFrom(self.Input.meta)
@@ -43,35 +44,34 @@ class OpSlic3D(Operator):
     def execute(self, slot, subindex, roi, result):
         
         input_data = self.Input(roi.start, roi.stop).wait()
+        axistags = self.Input.meta.axistags
 
         if(slot is self.Output):
-            if len(input_data.shape) == 3 :
-                slic_sp =    slic.Compute2DSlic(input_data, 
-                                                int(self.SuperPixelSize.value),
-                                                self.Compactness.value,
-                                                int(self.MaxIter.value))   
-                result[:] = slic_sp
-            elif len(input_data.shape) == 4 :
-                # start_time = time.time()
+            if not 'z' in axistags :
+                if not 't' in axistags :
+                    slic_sp =    slic.Compute2DSlic(input_data, 
+                                                    int(self.SuperPixelSize.value),
+                                                    self.Compactness.value,
+                                                    int(self.MaxIter.value))   
+                    result[:] = slic_sp
+                else :
+                    assert axistags.index('t') ==0, "t axis has to be at index 0, not {} ".format(axistags.index('t'))
+                    f = lambda input_data : slic.Compute2DSlic(input_data, 
+                                                    int(self.SuperPixelSize.value),
+                                                    self.Compactness.value,
+                                                    int(self.MaxIter.value))
+                    slic_sp = map(f, input_data) 
+                    result[:] = numpy.asarray(slic_sp)
+            elif 'z' in axistags and not 't' in axistags :
                 slic_sp =    slic.Compute3DSlic(input_data[:,:,:,0], 
                                                 int(self.SuperPixelSize.value), 
                                                 self.Compactness.value, 
                                                 int(self.MaxIter.value))   
-                # print("--- %s seconds ---" % (time.time() - start_time))
-                # start_time = time.time()
-                # slic_sp = skimage.segmentation.slic(input_data,
-                #                             n_segments=638,
-                #                             compactness=self.Compactness.value)  
-                # print("--- %s seconds ---" % (time.time() - start_time))
 
-                result[:] = slic_sp[...,None] #<--- Add Channel axis
+                result[:] = slic_sp[...,None] # Add Channel axis
             else:
                 assert False, "Can't be here, dimensions of input array have to match 2D or 3D "
         elif slot is self.Boundaries:
-            # print 'Updating self.Boundaries'
-            # print 'Slot status : ', slot.ready()
-            # traceback.print_stack()
-            # print '-------------------------------------'
             if len(self.tempArray.shape) > 3 and (self.tempArray.shape == input_data.shape):  # this is necessary when processing a new volume
                 result[:] = self.tempArray[:,:,:]
             else:
@@ -97,6 +97,17 @@ class OpSlic3D(Operator):
         self.tempArray[:] = boundaries[:,:,:,None] 
         # Updated self.Boundaries, update display with setDirty.
         self.Boundaries.setDirty() # this doesn't cause the display to be updated on the first time...why?
+
+    def _checkConstraints(self, laneIndex):
+        thisLaneTaggedShape = self.InputImages[laneIndex].meta.getTaggedShape()
+        
+        if thisLaneTaggedShape.has_key('t'):
+            raise DatasetConstraintError(
+                "Objects Counting Workflow",
+                "All input images must be 2D (they cannot contain the t dimension).  "\
+                "Your new image has {} t dimension"\
+                .format( thisLaneTaggedShape['t']))
+                # Find a different lane and use it for comparison
 
 class OpCachedSlic3D(Operator):
     """
