@@ -14,6 +14,8 @@ from sklearn import linear_model
 
 logger = logging.getLogger(__name__)
 
+import matplotlib.pyplot as plt
+
 class ArtetaPipeline(object):
     
     def __init__(self,
@@ -128,6 +130,21 @@ class ArtetaPipeline(object):
     
     def predict(self, imgs, masks):
         res = np.asarray(map(self.predict_one, imgs, masks))
+        # display debug
+        # f, ax = plt.subplots(2,2) #(3,3)
+        # plt.axis('off')
+        # ax[0,0].imshow(res[0])
+        # ax[0,1].imshow(res[1])
+        # ax[1,0].imshow(res[2])
+        # ax[1,1].imshow(res[3])
+        # # ax[0,2].imshow(res[4])
+        # # ax[1,2].imshow(res[5])
+        # # ax[2,0].imshow(res[6])
+        # # ax[2,1].imshow(res[7])
+        # # ax[2,2].imshow(res[8])
+
+        # plt.show()
+
         return res
 
     def set_params(self, **args):

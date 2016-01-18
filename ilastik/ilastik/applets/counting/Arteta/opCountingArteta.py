@@ -124,7 +124,7 @@ class OpCountingArteta( Operator ):
 		self.opTrain = OpTrainArtetaCounter( parent=self, graph=self.graph )
 		self.opTrain.inputs['InputImages'].connect( self.InputImages)
 		self.opTrain.inputs['Labels'].connect( self.GetFore.Output) 
-		# FIXME : it should be done using the same 'slot' mechanism, this is done "manually", through GUI interface, thus the next line is commented.
+		# FIXME : it should be done using the 'slot' mechanism, this is done "manually", through GUI interface, thus the next line is commented.
 		# self.opTrain.inputs['BoxConstraintValues'].connect( self.opLabelPipeline.BoxOutput ) 
 		self.opTrain.inputs['Features'].connect( self.FeatureImages ) 
 		self.opTrain.inputs["nonzeroLabelBlocks"].connect( self.opLabelPipeline.nonzeroBlocks )
@@ -167,7 +167,6 @@ class OpCountingArteta( Operator ):
 
 		def handleNewInputImage( multislot, index, *args ):
 			def handleInputReady(slot):
-				# Chris - maybe a really bad idea - check constraints now?
 				self._checkConstraints(index)
 				self.setupCaches( multislot.index(slot) )
 			multislot[index].notifyReady(handleInputReady)
@@ -200,6 +199,38 @@ class OpCountingArteta( Operator ):
 		self.PmapColors.meta.dtype = object
 		self.PmapColors.meta.shape = (1,)
 		self.MaxLabelValue.setValue(2)
+
+		axisOrder = [ tag.key for tag in self.InputImages[0].meta.axistags ]
+
+		blockDimsX = { 't' : (1,1),
+					   'z' : (256,256),
+					   'y' : (256,256),
+					   'x' : (1,1),
+					   'c' : (100, 100) }
+
+		blockDimsY = { 't' : (1,1),
+					   'z' : (256,256),
+					   'y' : (1,1),
+					   'x' : (256,256),
+					   'c' : (100,100) }
+
+		blockDimsZ = { 't' : (1,1),
+					   'z' : (1,1),
+					   'y' : (256,256),
+					   'x' : (256,256),
+					   'c' : (100,100) }
+		
+		innerBlockShapeX = tuple( blockDimsX[k][0] for k in axisOrder )
+		outerBlockShapeX = tuple( blockDimsX[k][1] for k in axisOrder )
+
+		innerBlockShapeY = tuple( blockDimsY[k][0] for k in axisOrder )
+		outerBlockShapeY = tuple( blockDimsY[k][1] for k in axisOrder )
+
+		innerBlockShapeZ = tuple( blockDimsZ[k][0] for k in axisOrder )
+		outerBlockShapeZ = tuple( blockDimsZ[k][1] for k in axisOrder )
+
+		# self.CachedPredictionProbabilities.innerBlockShape.setValue( (innerBlockShapeX, innerBlockShapeY, innerBlockShapeZ) )
+		# self.CachedPredictionProbabilities.outerBlockShape.setValue( (outerBlockShapeX, outerBlockShapeY, outerBlockShapeZ) )
 
 
 	def setupCaches(self, imageIndex):
@@ -285,7 +316,6 @@ class OpArtetaPredictionPipelineNoCache(Operator):
 	"""
 	InputImages = InputSlot()
 	FeatureImages = InputSlot()
-	# MaxLabel = InputSlot() # this slot is never set --> makes our Operator.Density not ready --> helps us, bug at launching otherwise --> why?
 	Classifier = InputSlot()
 	FreezePredictions = InputSlot()
 	PredictionsFromDisk = InputSlot( optional=True )
@@ -377,7 +407,7 @@ class OpArtetaPredictionPipeline(OpArtetaPredictionPipelineNoCache):
 
 	def setupOutputs(self):
 		# set cache block shape to input dimension
-		self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape)
+		self.prediction_cache_gui.blockShape.setValue(self.predict.PMaps.meta.shape) #[1:])
 		# pass
 
 class OpPredictArtetaCounter(Operator):
@@ -434,12 +464,17 @@ class OpPredictArtetaCounter(Operator):
 		print 'Result global shape ', res.shape
 		if isSingleImage : 
 			res = res[0,...] # remove t dimension, as it wasn't in the input meta
+		
 
-		return res[roiAsSlice]
+		# import matplotlib.pyplot as plt
+		# plt.imshow(res[2,...,0])
+		# plt.show()
+
+		return res #[roiAsSlice]
 
 	def propagateDirty(self, slot, subindex, roi):
 		self.outputs["PMaps"].setDirty()
-
+		self.outputs["OutputSum"].setDirty()
 
 
 class OpTrainArtetaCounter(Operator):
@@ -493,9 +528,9 @@ class OpTrainArtetaCounter(Operator):
 		imgs = self.InputImages[0][:].wait()
 		boxes = self.BoxesCoords[:].wait()
 
-		print self.Labels[0].meta.axistags
-		print self.InputImages[0].meta.axistags
-		print self.Features[0].meta.axistags
+		# print self.Labels[0].meta.axistags
+		# print self.InputImages[0].meta.axistags
+		# print self.Features[0].meta.axistags
 
 		# set params from UI
 		params = {"sigma": self.Sigma.value,"maxDepth" : self.MaxDepth.value}
